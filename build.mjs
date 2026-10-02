@@ -6,7 +6,7 @@ const strip = s => s.replace(/^import .*?;\s*$/gm, '').replace(/^export (async f
 const noClose = s => s.replace(/<\/script/gi, '<\\/script');   // keep inline <script> bodies intact
 
 const vendor = ['pako_inflate.min.js', 'jszip.min.js', 'elk.bundled.js'].map(f => `/* ${f} */\n` + r('vendor/' + f)).join('\n;\n');
-const sample = JSON.stringify(r('samples/security.drawio'));
+const sample = JSON.stringify(r(process.argv[2] || 'samples/security.drawio'));   // optional: node build.mjs path/to/other.drawio
 const app = '(function(){"use strict";\n' + order.map(m => strip(r(`src/${m}.js`))).join('\n') + '\n' + strip(r('src/app.js')).replace("/*__SAMPLE__*/''", sample) + '\n})();';
 const html = r('src/index.html')
   .replace('/*__CSS__*/', () => r('src/style.css'))

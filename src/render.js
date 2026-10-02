@@ -50,7 +50,7 @@ function nodeSVG(n) {
   const sw = +s.strokeWidth || 1;
   const dash = s.dashed === '1' ? ` stroke-dasharray="${(s.dashPattern || '6 4').replace(/ /g, ' ')}"` : '';
   const attrs = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash}`;
-  let body = '', labelBox = { cx: x + w / 2, cy: y + h / 2, w: w - 8 }, top = false;
+  let body = '', custom = null, labelBox = { cx: x + w / 2, cy: y + h / 2, w: w - 8 }, top = false;
   const rx = s.rounded === '1' ? Math.min(+s.arcSize ? (+s.arcSize / 100) * Math.min(w, h) : 10, h / 2) : 0;
   switch (k) {
     case 'ellipse': body = `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" ${attrs}/>`; break;
@@ -62,14 +62,18 @@ function nodeSVG(n) {
       body = `<path d="M${x},${y + e}V${y + h - e}A${w / 2},${e} 0 0 0 ${x + w},${y + h - e}V${y + e}A${w / 2},${e} 0 0 0 ${x},${y + e}Z" ${attrs}/><path d="M${x},${y + e}A${w / 2},${e} 0 0 0 ${x + w},${y + e}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
       labelBox.cy = y + h / 2 + e / 2; break; }
     case 'text': break;
-    case 'swimlane': { const hh = +s.startSize || 23;
-      body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${attrs.replace(`fill="${fill}"`, 'fill="none"')}/><rect x="${x}" y="${y}" width="${w}" height="${hh}" ${attrs}/>`;
-      labelBox = { cx: x + w / 2, cy: y + hh / 2, w: w - 8 }; break; }
+    case 'swimlane': { const hh = +s.startSize || 23, vert = s.horizontal === '0';
+      const bodyFill = color(s.swimlaneFillColor, 'none');
+      const hdr = vert ? `<rect x="${x}" y="${y}" width="${hh}" height="${h}" ${attrs}/>` : `<rect x="${x}" y="${y}" width="${w}" height="${hh}" ${attrs}/>`;
+      body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${attrs.replace(`fill="${fill}"`, `fill="${bodyFill}"`)}/>${hdr}`;
+      if (vert) { const cx = x + hh / 2, cy = y + h / 2; custom = `<g transform="rotate(-90 ${cx} ${cy})">${textEl(n.text, cx, cy, h - 8, s)}</g>`; }
+      else labelBox = { cx: x + w / 2, cy: y + hh / 2, w: w - 8 };
+      break; }
     case 'group': body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${s.strokeColor ? stroke : '#888'}" stroke-dasharray="${s.dashed === '0' ? '' : '6 4'}" stroke-width="${sw}"/>`; labelBox = { cx: x + 8, cy: y + 4, w: w - 16 }; top = true; break;
     default: body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" ${attrs}/>`;
   }
   const st = k === 'group' ? { ...s, align: 'left' } : s;
-  const label = textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
+  const label = custom !== null ? custom : textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
   return `<g class="n${n.isGroup ? ' grp' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
 }
 
@@ -89,9 +93,9 @@ function clip(n, from, to) {
   return { x: from.x + dx * t, y: from.y + dy * t };
 }
 
-const DIR = { L: [-1, 0], R: [1, 0], T: [0, -1], B: [0, 1] };
-const sideOfPort = (fx, fy) => (fx <= 0 ? 'L' : fx >= 1 ? 'R' : fy <= 0 ? 'T' : fy >= 1 ? 'B' : null);
-const sideMid = (n, side) => ({ L: { x: n.x, y: n.y + n.h / 2 }, R: { x: n.x + n.w, y: n.y + n.h / 2 }, T: { x: n.x + n.w / 2, y: n.y }, B: { x: n.x + n.w / 2, y: n.y + n.h } })[side];
+export const DIR = { L: [-1, 0], R: [1, 0], T: [0, -1], B: [0, 1] };
+export const sideOfPort = (fx, fy) => (fx <= 0 ? 'L' : fx >= 1 ? 'R' : fy <= 0 ? 'T' : fy >= 1 ? 'B' : null);
+export const sideMid = (n, side) => ({ L: { x: n.x, y: n.y + n.h / 2 }, R: { x: n.x + n.w, y: n.y + n.h / 2 }, T: { x: n.x + n.w / 2, y: n.y }, B: { x: n.x + n.w / 2, y: n.y + n.h } })[side];
 
 // explicit draw.io port (exitX/exitY/entryX/entryY, plus Dx/Dy offsets) -> {pt, side} or null
 function portOf(n, s, pre) {
@@ -101,7 +105,7 @@ function portOf(n, s, pre) {
 }
 
 // default sides when no port is given: face each other along the axis with a gap between the boxes
-function defaultSides(a, b) {
+export function defaultSides(a, b) {
   const gapX = a.x + a.w <= b.x ? 'R' : b.x + b.w <= a.x ? 'L' : null;
   const gapY = a.y + a.h <= b.y ? 'B' : b.y + b.h <= a.y ? 'T' : null;
   const opp = { L: 'R', R: 'L', T: 'B', B: 'T' };
@@ -112,7 +116,7 @@ function defaultSides(a, b) {
   return [side, opp[side]];
 }
 
-function orthoPath(A, sa, B, sb, stub = 20) {
+export function orthoPath(A, sa, B, sb, stub = 20) {
   const da = DIR[sa], db = DIR[sb];
   const ha = da[0] !== 0, hb = db[0] !== 0;
   let pts;

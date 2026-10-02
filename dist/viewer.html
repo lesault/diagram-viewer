@@ -6928,7 +6928,7 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
         if (d < bd) { bd = d; best = n; }
       }
       if (!best) for (const n of nodes.values()) {
-        if (!n.isContainer) continue;
+        if (!n.isContainer || n.style.swimlane) continue;   // never glue an edge to a lane/pool
         if (distToBox(pt, n) === 0 && (!best || n.w * n.h < best.w * best.h)) best = n;
       }
       return best ? best.id : null;
@@ -6959,7 +6959,7 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
   const labels = new Map();
   for (const n of nodes.values()) {
     if (n.isGroup) continue;
-    if (!hasEdge.has(n.id)) diagnostics.unconnected.push(n.id);
+    if (!hasEdge.has(n.id) && !n.style.text) diagnostics.unconnected.push(n.id);
     const t = n.text.trim();
     if (t) labels.set(t, (labels.get(t) || []).concat(n.id));
   }
@@ -7065,6 +7065,29 @@ function subModel(model, nodeIds, edgeIds, { fitGroups = true, keepGroups = true
 
 const depthOf = (nodes, n) => { let d = 0; while (n.parent && nodes.has(n.parent)) { n = nodes.get(n.parent); d++; } return d; };
 
+/**
+ * Detect swimlane structure: a "pool" (root group whose children are groups) holding lanes, or
+ * several sibling root swimlanes. axis 'row' = header on the left (horizontal=0), else 'col'.
+ * Lanes come back ordered by position along the stacking axis.
+ */
+function findLanes(m) {
+  const all = [...m.nodes.values()];
+  const groups = all.filter(n => n.isGroup);
+  const roots = groups.filter(g => !g.parent || !m.nodes.has(g.parent));
+  const kidGroups = g => groups.filter(c => c.parent === g.id);
+  let blocks = roots.filter(r => kidGroups(r).length).map(p => ({ pool: p, lanes: kidGroups(p) }));
+  if (!blocks.length) {
+    const sw = roots.filter(r => r.style.swimlane);
+    if (sw.length < 2) return null;
+    blocks = [{ pool: null, lanes: sw }];
+  }
+  const axis = blocks[0].lanes[0].style.horizontal === '0' ? 'row' : 'col';
+  const key = axis === 'row' ? 'y' : 'x';
+  for (const b of blocks) b.lanes.sort((p, q) => p[key] - q[key]);
+  blocks.sort((p, q) => (p.pool || p.lanes[0])[key] - (q.pool || q.lanes[0])[key]);
+  return { blocks, axis };
+}
+
 function fitContainers(m, pad = 20, header = 30) {
   const list = [...m.nodes.values()].filter(n => n.isContainer).sort((a, b) => depthOf(m.nodes, b) - depthOf(m.nodes, a));
   for (const g of list) {
@@ -7074,6 +7097,27 @@ function fitContainers(m, pad = 20, header = 30) {
     const x1 = Math.max(...ch.map(c => c.x + c.w)), y1 = Math.max(...ch.map(c => c.y + c.h));
     g.x = x0 - pad; g.y = y0 - pad - header; g.w = x1 - x0 + 2 * pad; g.h = y1 - y0 + 2 * pad + header;
   }
+  const lanes = findLanes(m);
+  if (lanes) for (const b of lanes.blocks) fitLaneBlock(m, b, lanes.axis, pad);
+}
+
+// Lanes become full-width bands that touch each other; the pool wraps them. Works for rows and columns.
+function fitLaneBlock(m, { pool, lanes }, axis, pad) {
+  const R = axis === 'row' ? { st: 'y', sz: 'h', al: 'x', az: 'w' } : { st: 'x', sz: 'w', al: 'y', az: 'h' };
+  const live = lanes.filter(l => [...m.nodes.values()].some(c => c.parent === l.id));
+  if (!live.length) return;
+  const ext = l => {
+    const ch = [...m.nodes.values()].filter(c => c.parent === l.id);
+    return { s0: Math.min(...ch.map(c => c[R.st])), s1: Math.max(...ch.map(c => c[R.st] + c[R.sz])), a0: Math.min(...ch.map(c => c[R.al])), a1: Math.max(...ch.map(c => c[R.al] + c[R.az])) };
+  };
+  const e = live.map(ext), hdr = live.map(l => +l.style.startSize || 23);
+  const A0 = Math.min(...e.map((q, i) => q.a0 - pad - hdr[i])), A1 = Math.max(...e.map(q => q.a1 + pad));
+  const bound = [e[0].s0 - pad];
+  for (let i = 1; i < live.length; i++) bound.push((e[i - 1].s1 + pad + e[i].s0 - pad) / 2);
+  bound.push(e[e.length - 1].s1 + pad);
+  live.forEach((l, i) => { l[R.al] = A0; l[R.az] = A1 - A0; l[R.st] = bound[i]; l[R.sz] = bound[i + 1] - bound[i]; });
+  for (const l of lanes) if (!live.includes(l)) m.nodes.delete(l.id);
+  if (pool) { const ph = +pool.style.startSize || 23; pool[R.al] = A0 - ph; pool[R.az] = A1 - A0 + ph; pool[R.st] = bound[0]; pool[R.sz] = bound[live.length] - bound[0]; }
 }
 
 const depthSorted = m => [...m.nodes.values()].sort((a, b) => depthOf(m.nodes, a) - depthOf(m.nodes, b) || a.order - b.order);
@@ -7129,7 +7173,7 @@ function nodeSVG(n) {
   const sw = +s.strokeWidth || 1;
   const dash = s.dashed === '1' ? ` stroke-dasharray="${(s.dashPattern || '6 4').replace(/ /g, ' ')}"` : '';
   const attrs = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash}`;
-  let body = '', labelBox = { cx: x + w / 2, cy: y + h / 2, w: w - 8 }, top = false;
+  let body = '', custom = null, labelBox = { cx: x + w / 2, cy: y + h / 2, w: w - 8 }, top = false;
   const rx = s.rounded === '1' ? Math.min(+s.arcSize ? (+s.arcSize / 100) * Math.min(w, h) : 10, h / 2) : 0;
   switch (k) {
     case 'ellipse': body = `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" ${attrs}/>`; break;
@@ -7141,14 +7185,18 @@ function nodeSVG(n) {
       body = `<path d="M${x},${y + e}V${y + h - e}A${w / 2},${e} 0 0 0 ${x + w},${y + h - e}V${y + e}A${w / 2},${e} 0 0 0 ${x},${y + e}Z" ${attrs}/><path d="M${x},${y + e}A${w / 2},${e} 0 0 0 ${x + w},${y + e}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
       labelBox.cy = y + h / 2 + e / 2; break; }
     case 'text': break;
-    case 'swimlane': { const hh = +s.startSize || 23;
-      body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${attrs.replace(`fill="${fill}"`, 'fill="none"')}/><rect x="${x}" y="${y}" width="${w}" height="${hh}" ${attrs}/>`;
-      labelBox = { cx: x + w / 2, cy: y + hh / 2, w: w - 8 }; break; }
+    case 'swimlane': { const hh = +s.startSize || 23, vert = s.horizontal === '0';
+      const bodyFill = color(s.swimlaneFillColor, 'none');
+      const hdr = vert ? `<rect x="${x}" y="${y}" width="${hh}" height="${h}" ${attrs}/>` : `<rect x="${x}" y="${y}" width="${w}" height="${hh}" ${attrs}/>`;
+      body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${attrs.replace(`fill="${fill}"`, `fill="${bodyFill}"`)}/>${hdr}`;
+      if (vert) { const cx = x + hh / 2, cy = y + h / 2; custom = `<g transform="rotate(-90 ${cx} ${cy})">${textEl(n.text, cx, cy, h - 8, s)}</g>`; }
+      else labelBox = { cx: x + w / 2, cy: y + hh / 2, w: w - 8 };
+      break; }
     case 'group': body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${s.strokeColor ? stroke : '#888'}" stroke-dasharray="${s.dashed === '0' ? '' : '6 4'}" stroke-width="${sw}"/>`; labelBox = { cx: x + 8, cy: y + 4, w: w - 16 }; top = true; break;
     default: body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" ${attrs}/>`;
   }
   const st = k === 'group' ? { ...s, align: 'left' } : s;
-  const label = textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
+  const label = custom !== null ? custom : textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
   return `<g class="n${n.isGroup ? ' grp' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
 }
 
@@ -7289,12 +7337,15 @@ function renderSVG(model, { standalone = false, margin = 20, title = '', backgro
 }
 
 
+
 /**
  * Re-layout a sub-model with ELK (layered, left -> right) so a service view reads as
  * inputs -> service -> outputs. Containers become compound nodes. Returns a new model.
  * `ELK` is the elkjs constructor (global in the browser, passed in for tests).
  */
 async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, focus = null } = {}) {
+  const lanes = findLanes(sub);
+  if (lanes) return tidyLanes(sub, lanes, ELK, { spacing, focus });
   const nodes = new Map([...sub.nodes].map(([k, v]) => [k, { ...v }]));
   const childrenOf = new Map();
   for (const n of nodes.values()) {
@@ -7350,6 +7401,164 @@ async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, focus = 
     outEdges.push(e);
   }
   return { nodes, edges: outEdges, groups: sub.groups, diagnostics: sub.diagnostics, focus };
+}
+
+// ---------- swimlane-aware tidy ----------
+const transposeModel = m => {
+  for (const n of m.nodes.values()) { [n.x, n.y] = [n.y, n.x]; [n.w, n.h] = [n.h, n.w]; }
+  const t = p => ({ x: p.y, y: p.x });
+  for (const e of m.edges) { if (e.route) e.route = e.route.map(t); e.points = e.points.map(t); }
+};
+const segHits = (p, q, r) => {
+  const x0 = Math.min(p.x, q.x), x1 = Math.max(p.x, q.x), y0 = Math.min(p.y, q.y), y1 = Math.max(p.y, q.y);
+  return x1 > r.x + 1 && x0 < r.x + r.w - 1 && y1 > r.y + 1 && y0 < r.y + r.h - 1;
+};
+
+/**
+ * Keeps the diagram's swimlanes as bands. ELK (flat, left -> right) decides the column each shape
+ * belongs to; shapes are then stacked inside their own lane, lanes are packed tight and wrapped by
+ * the pool, and connectors are routed through the gaps between columns. Column-style lanes
+ * (header on top) are handled by transposing, running the same code and transposing back.
+ */
+async function tidyLanes(sub, { blocks, axis }, ELK, { spacing, focus }) {
+  const m = {
+    nodes: new Map([...sub.nodes].map(([k, v]) => [k, { ...v }])),
+    edges: sub.edges.filter(e => e.source && e.target).map(e => ({ ...e, route: null, points: [] })),
+    groups: sub.groups, diagnostics: sub.diagnostics, focus,
+  };
+  const keep = new Set();
+  blocks.forEach(b => { if (b.pool) keep.add(b.pool.id); b.lanes.forEach(l => keep.add(l.id)); });
+  // leaves = everything that is not a pool/lane/other container; nested groups are flattened into their lane
+  const leaves = [...m.nodes.values()].filter(n => !n.isGroup);
+  const laneOf = new Map();
+  for (const n of leaves) {
+    let p = n.parent;
+    while (p && !blocks.some(b => b.lanes.some(l => l.id === p))) p = m.nodes.get(p) && m.nodes.get(p).parent;
+    laneOf.set(n.id, p || null);
+    n.parent = p || null;
+  }
+  for (const [id, n] of [...m.nodes]) if (n.isGroup && !keep.has(id)) m.nodes.delete(id);
+  const origLaneIds = blocks.map(b => b.lanes.map(l => l.id));
+  if (axis === 'col') transposeModel(m);
+
+  const HEAD = 24, PADY = 22, gapX = spacing + 70, gapY = Math.max(16, spacing / 2);
+  const res = await new ELK().layout({
+    id: 'root',
+    layoutOptions: { 'elk.algorithm': 'layered', 'elk.direction': 'RIGHT', 'elk.spacing.nodeNode': String(spacing), 'elk.layered.spacing.nodeNodeBetweenLayers': String(spacing + 20), 'elk.edgeRouting': 'ORTHOGONAL' },
+    children: leaves.map(n => ({ id: n.id, width: n.w, height: n.h })),
+    edges: m.edges.filter(e => m.nodes.has(e.source) && m.nodes.has(e.target)).map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+  });
+  const pos = new Map(res.children.map(c => [c.id, c]));
+
+  // columns from ELK's layer positions
+  const sorted = [...leaves].sort((a, b) => pos.get(a.id).x - pos.get(b.id).x || pos.get(a.id).y - pos.get(b.id).y);
+  const layerOf = new Map(), layers = [];
+  let start = -1e9;
+  for (const n of sorted) {
+    const x = pos.get(n.id).x;
+    if (!layers.length || x - start > 30) { layers.push([]); start = x; }
+    layers[layers.length - 1].push(n); layerOf.set(n.id, layers.length - 1);
+  }
+  const lw = layers.map(l => Math.max(...l.map(n => n.w)));
+
+  // bands: pool lanes in order, then shapes that sit in no lane
+  const bands = [];
+  blocks.forEach((b, bi) => b.lanes.forEach((l, li) => bands.push({ block: bi, lane: m.nodes.get(l.id), leaves: leaves.filter(n => laneOf.get(n.id) === l.id) })));
+  const loose = leaves.filter(n => !laneOf.get(n.id));
+  if (loose.length) bands.push({ block: -1, lane: null, leaves: loose });
+  const liveBands = bands.filter(b => b.leaves.length);
+
+  const poolHdr = b => (b.pool ? +b.pool.style.startSize || 23 : 0);
+  const laneHdr = l => (l ? +l.style.startSize || 23 : 0);
+  const PH = Math.max(0, ...blocks.map(poolHdr)), LH = Math.max(0, ...liveBands.map(b => laneHdr(b.lane)));
+  const x0 = PH + LH + HEAD;
+  const layerX = []; let cx = x0;
+  lw.forEach((w, k) => { layerX.push(cx); cx += w + gapX; });
+  const totalW = cx - gapX + HEAD;
+
+  let y = 0;
+  const poolBox = new Map();
+  for (let i = 0; i < liveBands.length; i++) {
+    const band = liveBands[i];
+    const byLayer = new Map();
+    for (const n of band.leaves.sort((a, b) => pos.get(a.id).y - pos.get(b.id).y)) {
+      const k = layerOf.get(n.id); if (!byLayer.has(k)) byLayer.set(k, []); byLayer.get(k).push(n);
+    }
+    const heights = new Map([...byLayer].map(([k, arr]) => [k, arr.reduce((s, n) => s + n.h, 0) + gapY * (arr.length - 1)]));
+    const inner = Math.max(...heights.values());
+    band.h = Math.max(inner + 2 * PADY, 70);
+    if (i > 0 && liveBands[i - 1].block !== band.block) y += 30;
+    band.y = y;
+    for (const [k, arr] of byLayer) {
+      let cy = y + (band.h - heights.get(k)) / 2;
+      for (const n of arr) { n.x = layerX[k] + (lw[k] - n.w) / 2; n.y = cy; cy += n.h + gapY; }
+    }
+    if (band.block >= 0) { const pb = poolBox.get(band.block) || { top: y, bottom: y }; pb.bottom = y + band.h; poolBox.set(band.block, pb); }
+    y += band.h;
+  }
+  for (const band of liveBands) if (band.lane) {
+    const ph = poolHdr(blocks[band.block]);
+    Object.assign(band.lane, { x: ph, y: band.y, w: totalW - ph, h: band.h });
+  }
+  blocks.forEach((b, i) => { if (b.pool && poolBox.has(i)) { const pb = poolBox.get(i); Object.assign(m.nodes.get(b.pool.id), { x: 0, y: pb.top, w: totalW, h: pb.bottom - pb.top }); } });
+  const liveIds = new Set([...liveBands.filter(b => b.lane).map(b => b.lane.id), ...blocks.filter((b, i) => b.pool && poolBox.has(i)).map(b => b.pool.id)]);
+  for (const [id, n] of [...m.nodes]) if (n.isGroup && !liveIds.has(id)) m.nodes.delete(id);
+  m.groups = new Map([...m.nodes].filter(([, n]) => n.isGroup));
+
+  routeLaneEdges(m, leaves, layerOf, layerX, lw, gapX);
+  if (axis === 'col') transposeModel(m);
+  return m;
+}
+
+function routeLaneEdges(m, leaves, layerOf, layerX, lw, gapX) {
+  const nodes = m.nodes, rects = leaves;
+  const fwd = m.edges.filter(e => nodes.has(e.source) && nodes.has(e.target) && layerOf.get(e.target) > layerOf.get(e.source));
+  const cy = n => n.y + n.h / 2;
+  const spread = (keyOf, otherOf) => {
+    const groups = new Map();
+    for (const e of fwd) { const k = keyOf(e); (groups.get(k) || groups.set(k, []).get(k)).push(e); }
+    const out = new Map();
+    for (const arr of groups.values()) {
+      arr.sort((a, b) => cy(nodes.get(otherOf(a))) - cy(nodes.get(otherOf(b))));
+      arr.forEach((e, i) => out.set(e.id, { f: (i + 1) / (arr.length + 1), rank: i, n: arr.length }));
+    }
+    return out;
+  };
+  const backRank = new Map();
+  const outS = spread(e => e.source, e => e.target), inS = spread(e => e.target, e => e.source);
+  for (const e of m.edges) {
+    const sn = nodes.get(e.source), tn = nodes.get(e.target);
+    if (!sn || !tn) continue;
+    let route;
+    if (fwd.includes(e)) {
+      const o = outS.get(e.id), i = inS.get(e.id);
+      const A = { x: sn.x + sn.w, y: sn.y + sn.h * o.f }, B = { x: tn.x, y: tn.y + tn.h * i.f };
+      let best = null;
+      for (let j = layerOf.get(e.source); j < layerOf.get(e.target); j++) {
+        const c = layerX[j] + lw[j] + gapX / 2 + (o.rank - (o.n - 1) / 2) * 6;
+        const pts = Math.abs(A.y - B.y) < 0.5 ? [A, B] : [A, { x: c, y: A.y }, { x: c, y: B.y }, B];
+        let score = 0;
+        for (let k = 1; k < pts.length; k++) for (const r of rects) if (r !== sn && r !== tn && segHits(pts[k - 1], pts[k], r)) score++;
+        if (!best || score < best.score) best = { score, pts };
+      }
+      route = best.pts;
+    } else if (layerOf.get(e.target) < layerOf.get(e.source)) {
+      // backward edge: loop over the top so it never runs along the forward connectors between the same shapes
+      const k = backRank.get(e.source) || 0; backRank.set(e.source, k + 1);
+      let bestB = null;
+      for (const side of ['T', 'B']) {
+        const pts = orthoPath(sideMid(sn, side), side, sideMid(tn, side), side, 22 + 9 * k);
+        let score = 0;
+        for (let i = 1; i < pts.length; i++) for (const r of rects) if (r !== sn && r !== tn && segHits(pts[i - 1], pts[i], r)) score++;
+        if (!bestB || score < bestB.score) bestB = { score, pts };
+      }
+      route = bestB.pts;
+    } else {
+      const [sa, sb] = defaultSides(sn, tn);
+      route = orthoPath(sideMid(sn, sa), sa, sideMid(tn, sb), sb);
+    }
+    e.route = route; e.points = route.slice(1, -1);
+  }
 }
 
 
@@ -7559,7 +7768,7 @@ function updateButtons() {
 function renderList() {
   const q = $('search').value.trim().toLowerCase();
   const ul = $('list'); ul.innerHTML = '';
-  const items = [...S.model.nodes.values()].filter(n => !n.isGroup && (n.text || n.id)).sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
+  const items = [...S.model.nodes.values()].filter(n => !n.isGroup && !n.style.text && (n.text || n.id)).sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
   for (const n of items) {
     const hay = (n.text + ' ' + Object.values(n.meta).join(' ')).toLowerCase();
     if (q && !hay.includes(q)) continue;

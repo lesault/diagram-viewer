@@ -153,7 +153,7 @@ function updateButtons() {
 function renderList() {
   const q = $('search').value.trim().toLowerCase();
   const ul = $('list'); ul.innerHTML = '';
-  const items = [...S.model.nodes.values()].filter(n => !n.isGroup && (n.text || n.id)).sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
+  const items = [...S.model.nodes.values()].filter(n => !n.isGroup && !n.style.text && (n.text || n.id)).sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
   for (const n of items) {
     const hay = (n.text + ' ' + Object.values(n.meta).join(' ')).toLowerCase();
     if (q && !hay.includes(q)) continue;

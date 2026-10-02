@@ -116,7 +116,7 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
         if (d < bd) { bd = d; best = n; }
       }
       if (!best) for (const n of nodes.values()) {
-        if (!n.isContainer) continue;
+        if (!n.isContainer || n.style.swimlane) continue;   // never glue an edge to a lane/pool
         if (distToBox(pt, n) === 0 && (!best || n.w * n.h < best.w * best.h)) best = n;
       }
       return best ? best.id : null;
@@ -147,7 +147,7 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
   const labels = new Map();
   for (const n of nodes.values()) {
     if (n.isGroup) continue;
-    if (!hasEdge.has(n.id)) diagnostics.unconnected.push(n.id);
+    if (!hasEdge.has(n.id) && !n.style.text) diagnostics.unconnected.push(n.id);
     const t = n.text.trim();
     if (t) labels.set(t, (labels.get(t) || []).concat(n.id));
   }
