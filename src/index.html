@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lineage Viewer</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<header>
+  <strong class="brand">Lineage Viewer</strong>
+  <button id="open">Open .drawio</button>
+  <button id="sample" class="ghost">Sample</button>
+  <input id="file" type="file" accept=".drawio,.xml,.dio" hidden>
+  <div id="tabs"></div>
+  <span class="sp"></span>
+  <div class="ctl" title="Which direction to follow from the hovered shape (u / d / b)">
+    <span class="seg" id="dir">
+      <button data-v="up">Upstream</button><button data-v="both" class="on">Both</button><button data-v="down">Downstream</button>
+    </span>
+  </div>
+  <label class="ctl" title="Hops from the shape (keys 1-9)">Hops
+    <input id="depth" type="range" min="1" max="8" value="2"><output id="depthOut">2</output>
+  </label>
+  <label class="ctl"><input id="inf" type="checkbox"> all</label>
+  <button id="preview" disabled title="Show the isolated service view on its own">Preview view</button>
+  <button id="export" disabled>Export…</button>
+</header>
+<main>
+  <aside id="left">
+    <input id="search" type="search" placeholder="Search shapes & metadata…">
+    <ul id="list"></ul>
+    <details id="diag"><summary>Diagnostics</summary><div id="diagBody"></div></details>
+  </aside>
+  <section id="stage">
+    <div id="canvasHost"></div>
+    <div id="empty"><p>Drop a <b>.drawio</b> file here, or use <b>Open</b>.</p><p class="hint">Hover a shape to isolate its lineage · click to pin · right-click to stop traversal through a hub · Esc to clear</p></div>
+    <div id="banner" hidden></div>
+    <div id="zoombar"><button id="fit">Fit</button></div>
+  </section>
+  <aside id="right"><div id="details"><p class="hint">Hover or select a shape to see its inputs and outputs.</p></div></aside>
+</main>
+<dialog id="dlg">
+  <form method="dialog" id="exportForm">
+    <h3>Export service view</h3>
+    <p id="dlgScope" class="hint"></p>
+    <label><input type="checkbox" id="optTidy" checked> Tidy layout (re-flow as a standalone diagram)</label>
+    <label><input type="checkbox" id="optZones" checked> Keep zones / containers</label>
+    <fieldset><legend>Formats</legend>
+      <label><input type="checkbox" id="fSvg" checked> SVG</label>
+      <label><input type="checkbox" id="fPng" checked> PNG (2×)</label>
+      <label><input type="checkbox" id="fDio" checked> draw.io</label>
+    </fieldset>
+    <div class="row">
+      <button type="button" id="doExport">Export current view</button>
+      <button type="button" id="doBatch" title="One file set per shape (matching the search filter), zipped">Export all services (.zip)</button>
+      <button value="cancel" class="ghost">Close</button>
+    </div>
+    <p id="dlgMsg" class="hint"></p>
+  </form>
+</dialog>
+<script>/*__VENDOR__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "diagram-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/"
+  },
+  "devDependencies": {
+    "elkjs": "^0.12.0"
+  }
+}
