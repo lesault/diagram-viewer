@@ -452,6 +452,7 @@ function init() {
   $('theme').onchange = e => applyTheme(e.target.value);
   $('invert').onchange = e => applyInvert(e.target.checked);
 
+  $('licBtn').onclick = () => { $('licText').textContent = $('licences').textContent; $('licDlg').showModal(); };
   $('open').onclick = () => $('file').click();
   $('file').onchange = async e => { const f = e.target.files[0]; if (f) loadText(await f.text(), f.name); e.target.value = ''; };
   $('sample').onclick = () => loadText(SAMPLE_XML, 'sample');

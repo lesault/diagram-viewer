@@ -8,7 +8,10 @@ const noClose = s => s.replace(/<\/script/gi, '<\\/script');   // keep inline <s
 const vendor = ['pako_inflate.min.js', 'jszip.min.js', 'elk.bundled.js'].map(f => `/* ${f} */\n` + r('vendor/' + f)).join('\n;\n');
 const sample = JSON.stringify(r(process.argv[2] || 'samples/security.drawio'));   // optional: node build.mjs path/to/other.drawio
 const app = '(function(){"use strict";\n' + order.map(m => strip(r(`src/${m}.js`))).join('\n') + '\n' + strip(r('src/app.js')).replace("/*__SAMPLE__*/''", sample) + '\n})();';
+// licence texts travel inside the file: MIT notice for this project plus every third-party notice (shown by the Licences button)
+const licences = r('LICENSE') + '\n\n' + r('THIRD-PARTY-NOTICES.md');
 const html = r('src/index.html')
+  .replace('/*__LICENCES__*/', () => noClose(licences))
   .replace('/*__CSS__*/', () => r('src/style.css'))
   .replace('/*__VENDOR__*/', () => noClose(vendor))
   .replace('/*__APP__*/', () => noClose(app));

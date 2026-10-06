@@ -30,6 +30,7 @@
   </div>
   <div class="grp">
     <select id="theme" title="Colour theme"><option value="auto">Theme: auto</option><option value="light">Light</option><option value="dark">Dark</option></select>
+    <button id="licBtn" class="ghost" title="Licence and third-party notices">Licences</button>
     <label class="ctl" id="invertWrap" title="In dark mode, also invert the diagram's own colours"><input id="invert" type="checkbox" checked> invert diagram</label>
   </div>
 </header>
@@ -106,6 +107,8 @@
     <p id="dlgMsg" class="hint"></p>
   </form>
 </dialog>
+<script type="text/plain" id="licences">/*__LICENCES__*/</script>
+<dialog id="licDlg"><form method="dialog"><h3>Licences</h3><p class="hint">Lineage Viewer is MIT-licensed. It contains third-party open-source libraries; their notices are below.</p><pre id="licText"></pre><div class="row"><button value="close">Close</button></div></form></dialog>
 <script>/*__VENDOR__*/</script>
 <script>/*__APP__*/</script>
 </body>

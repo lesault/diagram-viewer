@@ -108,3 +108,11 @@ The build concatenates the modules (no bundler) and inlines the vendored librari
 ## Planned
 
 Filter and colour by metadata, path finder between two services, collapsible zones, diff between two versions of a diagram, shareable view state in the URL.
+
+## Licence
+
+Lineage Viewer is released under the **MIT licence** (`LICENSE`), copyright (c) 2026 Lesault.
+
+It includes three unmodified open-source libraries, inlined into `dist/viewer.html`: **pako** (MIT and Zlib), **JSZip** (used under MIT) and **ELK / elkjs** (EPL-2.0). Their copyright notices and licence texts are in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md); provenance and checksums for each vendored file are in [`vendor/README.md`](vendor/README.md). `viewer.html` carries the same notices inside it (the **Licences** button), so the file can be passed on by itself.
+
+This is an independent tool. It is not affiliated with, endorsed by, or derived from code of draw.io / diagrams.net or JGraph; it reads the draw.io file format only. draw.io is a trademark of its owner, and other product names used in the sample diagrams (for example AWS, Azure, Microsoft 365, Kafka, SIEM vendors) are used only descriptively and belong to their owners.

@@ -83,3 +83,4 @@ dialog input[type=text]{width:100%;margin:2px 0}
 #viewbar.collapsed>:not(.vb-head){display:none}#viewbar .vb-head strong{cursor:pointer}
 .counts{margin:.2em 0 .4em}.check{display:flex;gap:6px;align-items:center}svg .badge{pointer-events:none}
 svg .el{pointer-events:none}
+#licDlg{max-width:760px;width:90vw}#licText{max-height:60vh;overflow:auto;white-space:pre-wrap;font:11px/1.4 ui-monospace,Menlo,monospace;background:var(--bg);padding:8px;border-radius:6px}
