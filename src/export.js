@@ -1,5 +1,5 @@
 import { depthSorted } from './subset.js';
-import { renderSVG, bounds, wrapLines, badgeText } from './render.js';
+import { renderSVG, bounds, wrapLines, badgeText, placeLabels } from './render.js';
 
 const xa = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#xa;');
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -55,10 +55,13 @@ export function toDrawio(model, { name = 'Service view', heading = null, margin 
   for (const n of back) cells.push(vertex(n));
   if (!hasLanes) cells.push(...frames);
   else cells.push(...frames);
+  const labelPos = placeLabels(model);          // where the viewer put each label; written as a label offset so draw.io shows them there
   for (const e of model.edges) {
+    const lp = (e.route || e.points.length) && labelPos.get(e.id);
+    const geo = lp ? ` x="${(2 * lp.f - 1).toFixed(3)}"` : '', off = lp ? `<mxPoint x="${Math.round(lp.x - lp.at.x)}" y="${Math.round(lp.y - lp.at.y)}" as="offset"/>` : '';
     const pts = e.points.length ? `<Array as="points">${e.points.map(p => `<mxPoint x="${Math.round(p.x)}" y="${Math.round(p.y)}"/>`).join('')}</Array>` : '';
     const src = e.source ? ` source="${xa(e.source)}"` : '', tgt = e.target ? ` target="${xa(e.target)}"` : '';
-    cells.push(`<mxCell id="${xa(e.id)}" value="${xa(e.rawLabel || e.label || '')}" style="${xa(edgeStyleFor(e, model.nodes))}" edge="1" parent="1"${src}${tgt}><mxGeometry relative="1" as="geometry">${pts}</mxGeometry></mxCell>`);
+    cells.push(`<mxCell id="${xa(e.id)}" value="${xa(e.rawLabel || e.label || '')}" style="${xa(edgeStyleFor(e, model.nodes))}" edge="1" parent="1"${src}${tgt}><mxGeometry${geo} relative="1" as="geometry">${pts}${off}</mxGeometry></mxCell>`);
   }
   for (const n of front) cells.push(vertex(n));
   if (badges) for (const n of front) {

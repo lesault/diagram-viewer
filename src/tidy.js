@@ -38,9 +38,10 @@ export async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, f
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.spacing.nodeNode': String(spacing), 'elk.layered.spacing.nodeNodeBetweenLayers': String(spacing + 20),
       'elk.edgeRouting': 'ORTHOGONAL', 'elk.layered.mergeEdges': 'false',
+      'elk.spacing.edgeLabel': '6', 'elk.layered.edgeLabels.centerLabelPlacementStrategy': 'MEDIAN_LAYER',
     },
     children: (childrenOf.get(null) || []).map(build),
-    edges: edges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    edges: edges.map(e => { const l = labelBox(e); return { id: e.id, sources: [e.source], targets: [e.target], labels: l ? [{ ...l, layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' } }] : [] }; }),
   };
   const res = await new ELK().layout(graph);
 
@@ -73,6 +74,12 @@ export async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, f
   layoutZones(out, { frameMeta: sub.frameMeta !== false });
   return out;
 }
+
+// connector labels are given room by the layout: ELK treats them as boxes sitting on the connector
+const labelBox = e => {
+  const t = String(e.label || '').split('\n')[0].trim(), fs = +(e.style && e.style.fontSize) || 11;
+  return t ? { id: e.id + '__label', text: t, width: Math.ceil(t.length * fs * 0.56 + 10), height: fs + 6 } : null;
+};
 
 // ---------- swimlane-aware tidy ----------
 const transposeModel = m => {
@@ -112,7 +119,8 @@ async function tidyLanes(sub, { blocks, axis }, ELK, { spacing, focus }) {
   const origLaneIds = blocks.map(b => b.lanes.map(l => l.id));
   if (axis === 'col') transposeModel(m);
 
-  const HEAD = 24, PADY = 22, gapX = spacing + 70, gapY = Math.max(16, spacing / 2);
+  const widest = Math.max(0, ...m.edges.map(e => (labelBox(e) || { width: 0 }).width));
+  const HEAD = 24, PADY = 22, gapX = Math.min(300, Math.max(spacing + 70, 2 * widest + 20)), gapY = Math.max(16, spacing / 2);
   const res = await new ELK().layout({
     id: 'root',
     layoutOptions: { 'elk.algorithm': 'layered', 'elk.direction': 'RIGHT', 'elk.spacing.nodeNode': String(spacing), 'elk.layered.spacing.nodeNodeBetweenLayers': String(spacing + 20), 'elk.edgeRouting': 'ORTHOGONAL' },

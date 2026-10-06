@@ -46,8 +46,8 @@ aside{background:var(--panel);overflow:auto;padding:8px;min-height:0}
 #zoombar{position:absolute;right:12px;bottom:12px}
 .hint{color:var(--mute);margin:.3em 0}
 /* focus / dimming */
-svg .n,svg .e{transition:opacity .08s}
-svg.focus .n:not(.hl),svg.focus .e:not(.hl){opacity:.1}
+svg .n,svg .e,svg .el{transition:opacity .08s}
+svg.focus .n:not(.hl),svg.focus .e:not(.hl),svg.focus .el:not(.hl){opacity:.1}
 svg.focus .z{opacity:.35}
 svg.focus .n.hl.f>:first-child{stroke:var(--hl);stroke-width:3}
 svg .n.blk>:first-child{stroke-dasharray:3 3}
@@ -82,3 +82,4 @@ dialog input[type=text]{width:100%;margin:2px 0}
 @media(max-width:1000px){main{grid-template-columns:1fr}aside{display:none}}
 #viewbar.collapsed>:not(.vb-head){display:none}#viewbar .vb-head strong{cursor:pointer}
 .counts{margin:.2em 0 .4em}.check{display:flex;gap:6px;align-items:center}svg .badge{pointer-events:none}
+svg .el{pointer-events:none}

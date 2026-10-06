@@ -1,6 +1,7 @@
 import { buildGraph } from './graph.js';
 import { findLanes } from './subset.js';
 import { routeMetrics } from './router.js';
+import { placeLabels } from './render.js';
 
 // Checks on the main diagram. Pure: takes the (layer-filtered) model and returns findings the UI can list,
 // highlight and export. severity: error | warn | info.
@@ -125,6 +126,9 @@ export function diagnose(model, { metaKey = null, zones = null, routes = true } 
     const m = routeMetrics(model);
     add('through-shapes', 'warn', 'Connectors drawn through other shapes', 'The line crosses a shape that is not one of its ends, which makes it look connected to it. Use Tidy to reroute connectors.',
       m.through.map(t => { const e = model.edges.find(x => x.id === t.edge); return { label: `${elabel(e)} passes through ${nm(t.node)}`, nodes: [t.node], edges: [t.edge] }; }));
+    const lp = placeLabels(model);
+    add('labels-obscured', 'info', 'Connector labels with no clear spot', 'The label overlaps a shape or another label wherever it is put. Tidy connectors, move the shapes apart, or shorten the label.',
+      model.edges.filter(e => lp.has(e.id) && !lp.get(e.id).clear).map(e => edgeItem(e)));
     if (m.overlaps > 0) findings.push({ id: 'overlapping-lines', severity: 'info', title: 'Connectors running on top of each other', help: `${m.overlaps} places where lines overlap and look like one. Tidy spreads them apart.`, items: [] });
   }
 

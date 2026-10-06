@@ -184,8 +184,7 @@ function arrow(tip, from, size, stroke, kind) {
   return `<polygon points="${tip.x.toFixed(1)},${tip.y.toFixed(1)} ${p(size, size / 2.4)} ${p(size, -size / 2.4)}" fill="${stroke}" stroke="${stroke}"/>`;
 }
 
-function edgeSVG(e, nodes) {
-  const pts = routeEdge(e, nodes);
+function edgeSVG(e, pts) {
   if (pts.length < 2) return '';
   const s = e.style, stroke = color(s.strokeColor, '#000000'), sw = +s.strokeWidth || 1;
   const dash = s.dashed === '1' || e.inferred || !e.source || !e.target ? ' stroke-dasharray="6 4"' : '';
@@ -195,16 +194,61 @@ function edgeSVG(e, nodes) {
   const ek = s.endArrow || 'classic', sk = s.startArrow || 'none';
   if (e.fwd) heads += arrow(pts[pts.length - 1], pts[pts.length - 2], size, stroke, ek === 'open' ? 'open' : 'filled');
   if (e.back) heads += arrow(pts[0], pts[1], size, stroke, sk === 'open' ? 'open' : 'filled');
-  let label = '';
-  if (e.label) {
-    let tot = 0; const seg = [];
-    for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); seg.push(l); tot += l; }
-    let acc = tot / 2, i = 0; while (i < seg.length - 1 && acc > seg[i]) { acc -= seg[i]; i++; }
-    const t = seg[i] ? acc / seg[i] : 0.5, a = pts[i], b = pts[i + 1];
-    const fs = +s.fontSize || 11;
-    label = `<text x="${(a.x + (b.x - a.x) * t).toFixed(1)}" y="${(a.y + (b.y - a.y) * t - 4).toFixed(1)}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="${fs}" fill="${color(s.fontColor, '#222')}" stroke="#fff" stroke-width="3" paint-order="stroke">${esc(e.label.split('\n')[0])}</text>`;
-  }
-  return `<g class="e" data-id="${esc(e.id)}"><path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}"${dash} stroke-linejoin="round"/>${heads}${label}</g>`;
+  return `<g class="e" data-id="${esc(e.id)}"><path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}"${dash} stroke-linejoin="round"/>${heads}</g>`;
+}
+
+const labelText = e => String(e.label || '').split('\n')[0].trim();
+
+/**
+ * Choose where each connector label goes. Candidates sit beside (or on) every segment of the connector; the best one
+ * is the position that overlaps no shape, no already-placed label and as few other connectors as possible.
+ * Returns Map<edgeId, {x,y,w,h,f,at:{x,y},clear}> (x,y = label centre; f = fraction along the path; at = the path point it hangs from).
+ */
+export function placeLabels(model, routes = null) {
+  const out = new Map();
+  const shapes = [...model.nodes.values()].filter(n => !n.isGroup && !n.ctxBox);
+  const obst = shapes.map(n => ({ x: n.x, y: n.y, w: n.w, h: n.h }));
+  for (const f of model.frames || []) obst.push({ x: f.x, y: f.y, w: f.w, h: 20 + f.lines.length * 12 });   // zone name headers
+  const rt = routes || new Map(model.edges.map(e => [e.id, routeEdge(e, model.nodes)]));
+  const segs = [];
+  model.edges.forEach((e, ei) => { const p = rt.get(e.id) || []; for (let i = 1; i < p.length; i++) segs.push({ ei, a: p[i - 1], b: p[i] }); });
+  const hit = (r, x0, y0, x1, y1) => Math.max(x0, x1) > r.x && Math.min(x0, x1) < r.x + r.w && Math.max(y0, y1) > r.y && Math.min(y0, y1) < r.y + r.h;
+  const placed = [];
+  model.edges.forEach((e, ei) => {
+    const text = labelText(e), pts = rt.get(e.id) || [];
+    if (!text || pts.length < 2) return;
+    const fs = +e.style.fontSize || 11, w = estW(text, fs, 0.56) + 6, h = fs + 4;
+    const lens = [0]; for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    const total = lens[lens.length - 1] || 1;
+    let best = null;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], L = lens[i] - lens[i - 1];
+      if (L < 6) continue;
+      const horiz = Math.abs(a.y - b.y) < 0.5, vert = Math.abs(a.x - b.x) < 0.5;
+      for (const t of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+        const mx = a.x + (b.x - a.x) * t, my = a.y + (b.y - a.y) * t;
+        const spots = horiz ? [[mx, my - h / 2 - 2, 0], [mx, my + h / 2 + 2, 1], [mx, my, 3]]
+          : vert ? [[mx + w / 2 + 4, my, 0], [mx - w / 2 - 4, my, 1], [mx, my, 3]] : [[mx, my, 2]];
+        for (const [cx, cy, pref] of spots) {
+          const r = { x: cx - w / 2, y: cy - h / 2, w, h };
+          let score = pref + Math.abs(t - 0.5) * 2;
+          if (horiz && L < w) score += (w - L) * 0.6;                    // label would overhang the segment
+          for (const o of obst) if (hit(r, o.x, o.y, o.x + o.w, o.y + o.h)) score += 1000;
+          for (const q of placed) if (hit(r, q.x - q.w / 2, q.y - q.h / 2, q.x + q.w / 2, q.y + q.h / 2)) score += 600;
+          for (const sg of segs) if (sg.ei !== ei && hit(r, sg.a.x, sg.a.y, sg.b.x, sg.b.y)) score += 40;
+          if (pref === 3) score += 6;                                      // sitting on its own line is the fallback
+          if (!best || score < best.score) best = { score, x: cx, y: cy, w, h, f: (lens[i - 1] + L * t) / total, at: { x: mx, y: my }, clear: score < 600 };
+        }
+      }
+    }
+    if (best) { placed.push(best); out.set(e.id, best); }
+  });
+  return out;
+}
+
+function labelSVG(e, pos) {
+  const fs = +e.style.fontSize || 11;
+  return `<g class="el" data-id="${esc(e.id)}"><text x="${pos.x.toFixed(1)}" y="${(pos.y + fs * 0.35).toFixed(1)}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="${fs}" fill="${color(e.style.fontColor, '#222')}" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round">${esc(labelText(e))}</text></g>`;
 }
 
 const estW = (t, fs, k = 0.58) => String(t).length * fs * k;
@@ -219,12 +263,13 @@ function frameSVG(f) {
     + `<text x="${(f.x + 10).toFixed(1)}" y="${(f.y + 16).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="bold" fill="${ink}">${esc(f.title)}</text>${lines}</g>`;
 }
 
-export function bounds(model, margin = 20) {
+export function bounds(model, margin = 20, extra = {}) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
   for (const n of model.nodes.values()) { add(n.x, n.y); add(n.x + n.w, n.y + n.h); }
   for (const f of model.frames || []) { add(f.x, f.y); add(f.x + f.w, f.y + f.h); }
-  for (const e of model.edges) for (const p of routeEdge(e, model.nodes)) add(p.x, p.y);
+  for (const e of model.edges) for (const p of (extra.routes && extra.routes.get(e.id)) || routeEdge(e, model.nodes)) add(p.x, p.y);
+  if (extra.labels) for (const l of extra.labels.values()) { add(l.x - l.w / 2, l.y - l.h / 2); add(l.x + l.w / 2, l.y + l.h / 2); }
   if (x0 === Infinity) { x0 = y0 = 0; x1 = y1 = 100; }
   return { x: x0 - margin, y: y0 - margin, w: x1 - x0 + 2 * margin, h: y1 - y0 + 2 * margin };
 }
@@ -235,7 +280,9 @@ export function bounds(model, margin = 20) {
  * focusId: emphasise one shape (the service the view is about).
  */
 export function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff', heading = null, focusId = null, badges = null } = {}) {
-  let b = bounds(model, margin);
+  const routes = new Map(model.edges.map(e => [e.id, routeEdge(e, model.nodes)]));
+  const labels = placeLabels(model, routes);
+  let b = bounds(model, margin, { routes, labels });
   const nodes = depthSorted(model);
   const li = new Map((model.layers || []).map((l, i) => [l.id, i]));
   const lay = n => (li.has(n.layer) ? li.get(n.layer) : 0);
@@ -261,7 +308,8 @@ export function renderSVG(model, { standalone = false, margin = 20, title = '', 
   }
 
   const body = back.map(n => nodeSVG(n)).join('') + (model.frames || []).map(frameSVG).join('')
-    + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + front.map(n => nodeSVG(n, n.id === focusId, badges && badges.get(n.id))).join('');
+    + model.edges.map(e => edgeSVG(e, routes.get(e.id))).join('') + front.map(n => nodeSVG(n, n.id === focusId, badges && badges.get(n.id))).join('')
+    + model.edges.map(e => (labels.has(e.id) ? labelSVG(e, labels.get(e.id)) : '')).join('');
   const vb = `${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}`;
   const bg = standalone && background && background !== 'none' ? `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${background}"/>` : '';
   const top = standalone

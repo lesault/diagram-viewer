@@ -102,3 +102,31 @@ test('connection counts: graph counts, SVG badge and draw.io badge cell', async 
   const back = buildModel(loadDrawio(toDrawio(s, { badges }), null)[0].graph);
   assert.equal(back.nodes.get('count_siem').text, 'in 2 · out 1');
 });
+
+test('connector labels: placed clear of shapes and each other, drawn above shapes, written to draw.io', async () => {
+  const { placeLabels } = await import('../src/render.js');
+  // unit: a shape hugging the upper side of the connector pushes the label below it
+  const mk = (id, x, y, w, h) => ({ id, x, y, w, h, text: id, style: {}, meta: {}, isGroup: false });
+  const nodes = new Map([['a', mk('a', 0, 0, 80, 40)], ['b', mk('b', 420, 0, 80, 40)], ['x', mk('x', 150, -40, 200, 52)]]);
+  const e = { id: 'e', source: 'a', target: 'b', label: 'syslog/TLS', style: {}, points: [], route: [{ x: 80, y: 20 }, { x: 420, y: 20 }], fwd: true };
+  const lp = placeLabels({ nodes, edges: [e] }).get('e');
+  const x = nodes.get('x');
+  assert.ok(lp.clear && (lp.y - lp.h / 2 >= x.y + x.h || lp.x + lp.w / 2 <= x.x || lp.x - lp.w / 2 >= x.x + x.w), 'label must not overlap the shape');
+  assert.ok(lp.f > 0 && lp.f < 1);
+
+  // every tidied 2-hop view of both samples has every label clear
+  let labels = 0;
+  for (const id of ['siem', 'soar', 'corr', 'lambda', 'idp', 'relay', 'agent']) {
+    if (!graph.out.has(id)) continue;
+    const t = await tidyModel(sub(id), ELK);
+    for (const [, p] of placeLabels(t)) { labels++; assert.ok(p.clear, `label obscured in view of ${id}`); }
+  }
+  assert.ok(labels > 20);
+
+  const t = await tidyModel(sub('siem'), ELK);
+  const svg = renderSVG(t, { standalone: true }).svg;
+  assert.ok(svg.lastIndexOf('class="el"') > svg.lastIndexOf('class="n'), 'labels are drawn after (above) shapes');
+  const dio = toDrawio(t);
+  assert.match(dio, /as="offset"/);
+  assert.equal(buildModel(loadDrawio(dio, null)[0].graph).edges.length, t.edges.length);
+});

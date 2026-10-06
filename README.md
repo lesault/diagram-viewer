@@ -47,6 +47,7 @@ With a shape pinned, **Preview view** shows its lineage as a standalone diagram,
 
 - **Heading**: a title and subtitle above the diagram, so it reads without the main diagram. Defaults to `{service} — {direction} lineage ({hops})` and `{file} · {page} · {date}`; edit freely. Tokens: `{service} {direction} {hops} {file} {page} {date}`.
 - **Tidy layout** re-flows the view so it reads inputs → service → outputs. In swimlane diagrams, shapes stay in their own lane and lanes keep their order. With it off, shapes keep their original positions and lanes are trimmed to fit.
+- **Connector labels** are placed beside the line, clear of shapes, zone headings and each other, and drawn above everything. The tidy layout leaves room for them, and labels are written into the draw.io export at the same positions. Any label that still has no clear spot is listed under Checks.
 - **Keep swimlanes**, **Zone frames**, **Zone properties** and **Highlight service** (thicker outline on the shape the view is about).
 
 ### Export

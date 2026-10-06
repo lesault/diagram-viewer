@@ -10,7 +10,7 @@ const S = {
     wholeTitle: '{file} — {page}', wholeSubtitle: 'Layers: {layers} · {date}' },
   counts: new Set(), countsAll: false,
   metaKey: '', diag: null,
-  els: { n: new Map(), e: new Map() }, hl: [], vb: null, bounds: null,
+  els: { n: new Map(), e: new Map(), l: new Map() }, hl: [], vb: null, bounds: null,
 };
 const SAMPLE_XML = /*__SAMPLE__*/'';
 const DIR_TEXT = { up: 'upstream', down: 'downstream', both: 'upstream & downstream' };
@@ -116,9 +116,10 @@ function drawCanvas(model, opts = {}, doFit = true) {
   const old = S.vb;
   $('canvasHost').innerHTML = svg;
   const el = $('canvasHost').firstElementChild;
-  S.els = { n: new Map(), e: new Map() };
+  S.els = { n: new Map(), e: new Map(), l: new Map() };
   el.querySelectorAll('.n').forEach(g => S.els.n.set(g.dataset.id, g));
   el.querySelectorAll('.e').forEach(g => S.els.e.set(g.dataset.id, g));
+  el.querySelectorAll('.el').forEach(g => S.els.l.set(g.dataset.id, g));
   S.hl = []; S.bounds = b;
   if (doFit || !old) fit(); else { S.vb = old; applyVB(); }
   for (const id of S.blocked) { const g = S.els.n.get(id); if (g) g.classList.add('blk'); }
@@ -200,6 +201,7 @@ function setupCanvasEvents() {
 function pin(id) { S.pinned = id; if (!id) { S.hover = null; S.finding = null; } refresh(); }
 
 function addHl(g, f) { if (g) { g.classList.add('hl'); if (f) g.classList.add(f); S.hl.push(g); } }
+const hlEdge = (eid, f) => { addHl(S.els.e.get(eid), f); addHl(S.els.l.get(eid)); };   // connector and its label together
 
 function refresh() {
   const svg = $('canvasHost').firstElementChild; if (!svg) return;
@@ -212,7 +214,7 @@ function refresh() {
     const v = computeView(id);
     const nodes = [...v.nodes.keys()];
     for (const nid of nodes) addHl(S.els.n.get(nid), nid === id ? 'f' : null);
-    for (const eid of v.edges) addHl(S.els.e.get(eid));
+    for (const eid of v.edges) hlEdge(eid);
     // containers and zone boxes holding highlighted shapes stay visible as context
     for (const [gid, g] of S.els.n) {
       const n = S.view.nodes.get(gid);
@@ -221,7 +223,7 @@ function refresh() {
     for (const nid of nodes) for (const z of S.zones.chain(nid)) addHl(S.els.n.get(z));
   } else if (fin) {
     for (const nid of fin.nodes) addHl(S.els.n.get(nid), 'dx');
-    for (const eid of fin.edges) addHl(S.els.e.get(eid), 'dx');
+    for (const eid of fin.edges) hlEdge(eid, 'dx');
   }
   updateChrome();
   renderDetails();
