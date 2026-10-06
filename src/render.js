@@ -42,7 +42,14 @@ function shapeKind(s) {
   return 'rect';
 }
 
-function nodeSVG(n, emph = false) {
+function badgeSVG(n, b) {
+  const t = `in ${b.in} · out ${b.out}`, w = Math.round(t.length * 5.1 + 12), h = 15;
+  const x = n.x + n.w - w - 4, y = n.y + n.h - h / 2;
+  return `<g class="badge"><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w}" height="${h}" rx="7.5" fill="#ffffff" stroke="#5b616b"/><text x="${(x + w / 2).toFixed(1)}" y="${(y + 10.5).toFixed(1)}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="9" fill="#1d2430">${t}</text></g>`;
+}
+export const badgeText = b => `in ${b.in} · out ${b.out}`;
+
+function nodeSVG(n, emph = false, badge = null) {
   const s = n.style, k = n.isGroup && !s.swimlane ? 'group' : shapeKind(s);
   const { x, y, w, h } = n;
   const fill = k === 'group' ? color(s.fillColor, 'none') : color(s.fillColor, '#ffffff');
@@ -72,9 +79,17 @@ function nodeSVG(n, emph = false) {
     case 'group': body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${s.strokeColor ? stroke : '#888'}" stroke-dasharray="${s.dashed === '0' ? '' : '6 4'}" stroke-width="${sw}"/>`; labelBox = { cx: x + 8, cy: y + 4, w: w - 16 }; top = true; break;
     default: body = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" ${attrs}/>`;
   }
+  // plain boxes and text shapes honour draw.io's label alignment (e.g. zone boxes with the name at top-left)
+  if (k === 'rect' || k === 'text') {
+    if (s.align === 'left') labelBox.cx = x + 6 + (+s.spacingLeft || 0);
+    else if (s.align === 'right') labelBox.cx = x + w - 6 - (+s.spacingRight || 0);
+    if (s.align === 'left' || s.align === 'right') labelBox.w = w - 12 - (+s.spacingLeft || 0);
+    if (s.verticalAlign === 'top') { labelBox.cy = y + 3 + (+s.spacingTop || 0); top = true; }
+    else if (s.verticalAlign === 'bottom') labelBox.cy = y + h - 12 - (+s.spacingBottom || 0);
+  }
   const st = k === 'group' ? { ...s, align: 'left' } : s;
   const label = custom !== null ? custom : textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
-  return `<g class="n${n.isGroup || n.ctxBox ? ' grp' : ''}${emph ? ' focus-shape' : ''}${n.ctxBox ? ' ctx' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
+  return `<g class="n${n.isGroup || n.ctxBox ? ' grp' : ''}${emph ? ' focus-shape' : ''}${n.ctxBox ? ' ctx' : ''}" data-id="${esc(n.id)}">${body}${label}${badge ? badgeSVG(n, badge) : ''}</g>`;
 }
 
 // ---- edge routing ----
@@ -219,7 +234,7 @@ export function bounds(model, margin = 20) {
  * heading: {title, subtitle} adds a title block above the diagram so it reads without the main diagram.
  * focusId: emphasise one shape (the service the view is about).
  */
-export function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff', heading = null, focusId = null } = {}) {
+export function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff', heading = null, focusId = null, badges = null } = {}) {
   let b = bounds(model, margin);
   const nodes = depthSorted(model);
   const li = new Map((model.layers || []).map((l, i) => [l.id, i]));
@@ -246,7 +261,7 @@ export function renderSVG(model, { standalone = false, margin = 20, title = '', 
   }
 
   const body = back.map(n => nodeSVG(n)).join('') + (model.frames || []).map(frameSVG).join('')
-    + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + front.map(n => nodeSVG(n, n.id === focusId)).join('');
+    + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + front.map(n => nodeSVG(n, n.id === focusId, badges && badges.get(n.id))).join('');
   const vb = `${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}`;
   const bg = standalone && background && background !== 'none' ? `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${background}"/>` : '';
   const top = standalone

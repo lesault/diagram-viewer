@@ -81,3 +81,4 @@ dialog input[type=text]{width:100%;margin:2px 0}
 [hidden]{display:none!important}
 @media(max-width:1000px){main{grid-template-columns:1fr}aside{display:none}}
 #viewbar.collapsed>:not(.vb-head){display:none}#viewbar .vb-head strong{cursor:pointer}
+.counts{margin:.2em 0 .4em}.check{display:flex;gap:6px;align-items:center}svg .badge{pointer-events:none}

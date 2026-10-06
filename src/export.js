@@ -1,5 +1,5 @@
 import { depthSorted } from './subset.js';
-import { renderSVG, bounds, wrapLines } from './render.js';
+import { renderSVG, bounds, wrapLines, badgeText } from './render.js';
 
 const xa = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#xa;');
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -23,7 +23,7 @@ function edgeStyleFor(e, nodes) {
  * Serialise a (sub-)model as an uncompressed draw.io file that opens and edits normally.
  * heading: {title, subtitle} is written as text cells above the diagram; zone frames become dashed container-style boxes.
  */
-export function toDrawio(model, { name = 'Service view', heading = null, margin = 20, focusId = null } = {}) {
+export function toDrawio(model, { name = 'Service view', heading = null, margin = 20, focusId = null, badges = null } = {}) {
   const cells = [];
   const all = depthSorted(model);
   const li = new Map((model.layers || []).map((l, i) => [l.id, i]));
@@ -61,6 +61,11 @@ export function toDrawio(model, { name = 'Service view', heading = null, margin 
     cells.push(`<mxCell id="${xa(e.id)}" value="${xa(e.rawLabel || e.label || '')}" style="${xa(edgeStyleFor(e, model.nodes))}" edge="1" parent="1"${src}${tgt}><mxGeometry relative="1" as="geometry">${pts}</mxGeometry></mxCell>`);
   }
   for (const n of front) cells.push(vertex(n));
+  if (badges) for (const n of front) {
+    const b = badges.get(n.id); if (!b) continue;
+    const t = badgeText(b), w = Math.round(t.length * 5.1 + 12);
+    cells.push(`<mxCell id="count_${xa(n.id)}" value="${xa(t)}" style="rounded=1;arcSize=50;html=1;fontSize=9;fillColor=#ffffff;strokeColor=#5b616b;spacing=1;" vertex="1" parent="1"><mxGeometry x="${Math.round(n.x + n.w - w - 4)}" y="${Math.round(n.y + n.h - 7)}" width="${w}" height="15" as="geometry"/></mxCell>`);
+  }
 
   if (heading && (heading.title || heading.subtitle)) {
     const b = bounds(model, margin), w = Math.max(b.w - 2 * margin, 560);

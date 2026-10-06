@@ -89,3 +89,16 @@ test('whole-diagram export after tidy keeps context boxes behind shapes and stil
   assert.ok(order.indexOf('dc') < order.indexOf('ad'), 'zone boxes first (behind)');
   assert.equal(back.edges.length, v.edges.length);
 });
+
+test('connection counts: graph counts, SVG badge and draw.io badge cell', async () => {
+  const { countConnections } = await import('../src/graph.js');
+  const c = countConnections(graph, 'siem');
+  assert.deepEqual(c, { in: 2, out: 1 });             // lambda + idp in; soc out
+  const badges = new Map([['siem', c]]);
+  const s = sub('siem');
+  const svg = renderSVG(s, { standalone: true, badges }).svg;
+  assert.match(svg, /in 2 · out 1/);
+  assert.ok(!/in \d+ · out/.test(renderSVG(s, { standalone: true }).svg));
+  const back = buildModel(loadDrawio(toDrawio(s, { badges }), null)[0].graph);
+  assert.equal(back.nodes.get('count_siem').text, 'in 2 · out 1');
+});

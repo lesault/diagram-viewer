@@ -8,6 +8,7 @@ const S = {
   previewing: false, previewModel: null,
   opt: { heading: true, title: '{service} — {direction} lineage ({hops})', subtitle: '{file} · {page} · {date}', tidy: true, lanes: true, zones: true, zoneMeta: true, focus: true,
     wholeTitle: '{file} — {page}', wholeSubtitle: 'Layers: {layers} · {date}' },
+  counts: new Set(), countsAll: false,
   metaKey: '', diag: null,
   els: { n: new Map(), e: new Map() }, hl: [], vb: null, bounds: null,
 };
@@ -15,6 +16,18 @@ const SAMPLE_XML = /*__SAMPLE__*/'';
 const DIR_TEXT = { up: 'upstream', down: 'downstream', both: 'upstream & downstream' };
 
 const focusId = () => S.pinned || S.hover;
+// connection-count badges: per shape, or for all shapes; counts always come from the main diagram
+function currentBadges() {
+  if (!S.view) return null;
+  const m = new Map();
+  for (const n of S.view.nodes.values()) if (!n.isGroup && !n.ctxBox && !n.style.text && (S.countsAll || S.counts.has(n.id))) m.set(n.id, countConnections(S.graph, n.id));
+  return m.size ? m : null;
+}
+function redrawBadges() {
+  if (S.previewing) { schedulePreview(0); return; }
+  drawCanvas(S.view, {}, false); renderDetails();
+}
+function toggleCounts(id) { S.counts.has(id) ? S.counts.delete(id) : S.counts.add(id); redrawBadges(); }
 const curDepth = () => (S.infinite ? Infinity : S.depth);
 const labelOf = n => (n.text || '').split('\n')[0].trim() || `(${n.id})`;
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -70,6 +83,7 @@ function selectPage(i) {
   S.hiddenLayers = new Set((S.full.layers || []).filter(l => !l.visible).map(l => l.id));
   S.ctxLayers = new Set(suggestContextLayers(S.full));
   S.suggested = new Set(S.ctxLayers);
+  S.counts = new Set([...S.full.nodes.values()].filter(n => /^(1|true|yes)$/i.test(String((n.meta || {}).show_counts || ''))).map(n => n.id));
   S.pinned = S.hover = null; S.tidied = false;
   [...$('tabs').children].forEach((b, j) => b.classList.toggle('on', j === i));
   rebuildView(true);
@@ -98,7 +112,7 @@ function rebuildView(fit) {
 
 // ---------- canvas ----------
 function drawCanvas(model, opts = {}, doFit = true) {
-  const { svg, bounds: b } = renderSVG(model, opts);
+  const { svg, bounds: b } = renderSVG(model, { badges: currentBadges(), ...opts });
   const old = S.vb;
   $('canvasHost').innerHTML = svg;
   const el = $('canvasHost').firstElementChild;
@@ -277,12 +291,14 @@ function renderDetails() {
     const items = [...v.nodes].filter(([nid]) => nid !== id && reach(id, nid, dir)).sort((a, b) => a[1] - b[1]);
     return items.length ? `<ul class="lin">${items.map(([nid, d]) => `<li data-id="${esc(nid)}">${esc(labelOf(S.view.nodes.get(nid)))} <small>${d} hop${d > 1 ? 's' : ''}</small></li>`).join('')}</ul>` : '<p class="hint">none</p>';
   };
-  box.innerHTML = `<h3>${esc(labelOf(n))}</h3>${layer && (S.full.layers || []).length > 1 ? `<p class="hint">Layer: ${esc(layer.name)}</p>` : ''}${rows ? `<table>${rows}</table>` : ''}`
+  const cc = countConnections(S.graph, id);
+  box.innerHTML = `<h3>${esc(labelOf(n))}</h3><p class="counts">Inbound <b>${cc.in}</b> · Outbound <b>${cc.out}</b></p><label class="check"><input type="checkbox" id="cntBox" ${S.countsAll || S.counts.has(id) ? 'checked' : ''} ${S.countsAll ? 'disabled' : ''}> Show counts on this shape <small class="hint">(c)</small></label>${layer && (S.full.layers || []).length > 1 ? `<p class="hint">Layer: ${esc(layer.name)}</p>` : ''}${rows ? `<table>${rows}</table>` : ''}`
     + (zones ? `<h4>Zones</h4>${zones}` : '')
     + (S.direction !== 'down' ? `<h4>Inputs (upstream)</h4>${list('up')}` : '')
     + (S.direction !== 'up' ? `<h4>Outputs (downstream)</h4>${list('down')}` : '')
     + `<p class="hint">${S.blocked.has(id) ? 'Traversal stops at this shape (right-click to undo).' : ''}</p>`;
   box.querySelectorAll('li').forEach(el => el.onclick = () => { const t = S.view.nodes.get(el.dataset.id); if (t) pin(t.id); });
+  const cb = $('cntBox'); if (cb) cb.onchange = () => toggleCounts(id);
 }
 const _reach = new Map();
 function reach(from, to, dir) {
@@ -351,10 +367,11 @@ const togglePreview = () => (S.previewing ? backToDiagram() : startPreview());
 const fmts = () => ({ svg: $('fSvg').checked, png: $('fPng').checked, dio: $('fDio').checked, pdf: $('fPdf').checked, scale: +$('fScale').value, bg: $('fBg').value });
 
 async function emit(sub, base, fmt, out, extra) {
-  const svg = toSVG(sub, base, { heading: extra.heading, focusId: extra.focusId, background: fmt.bg });
+  const badges = currentBadges();
+  const svg = toSVG(sub, base, { heading: extra.heading, focusId: extra.focusId, background: fmt.bg, badges });
   if (fmt.svg) out.push([base + '.svg', svg, 'image/svg+xml']);
   if (fmt.png) out.push([base + '.png', await svgToImageBlob(svg, { scale: fmt.scale, background: fmt.bg }), 'image/png']);
-  if (fmt.dio) out.push([base + '.drawio', toDrawio(sub, { name: base, heading: extra.heading, focusId: extra.focusId }), 'application/xml']);
+  if (fmt.dio) out.push([base + '.drawio', toDrawio(sub, { name: base, heading: extra.heading, focusId: extra.focusId, badges }), 'application/xml']);
   if (fmt.pdf && extra.print) printSvg(svg, base);
 }
 
@@ -438,6 +455,7 @@ function init() {
   $('sample').onclick = () => loadText(SAMPLE_XML, 'sample');
   $('fit').onclick = () => fit();
   $('search').oninput = () => S.view && renderList();
+  $('countsAll').onchange = e => { S.countsAll = e.target.checked; if (S.view) redrawBadges(); };
   $('dir').onclick = e => { const b = e.target.closest('button'); if (b) setDir(b.dataset.v); };
   $('depth').oninput = e => setDepth(+e.target.value);
   $('inf').onchange = e => { S.infinite = e.target.checked; if (S.previewing) schedulePreview(0); refresh(); };
@@ -474,6 +492,7 @@ function init() {
     if (typing || $('dlg').open) return;
     if (e.key === 'Escape') { if (S.previewing) backToDiagram(); else pin(null); }
     else if (/^[1-9]$/.test(e.key)) setDepth(+e.key);
+    else if (e.key === 'c' && S.pinned && !S.countsAll) toggleCounts(S.pinned);
     else if (e.key === 'u') setDir('up'); else if (e.key === 'd') setDir('down'); else if (e.key === 'b') setDir('both');
   });
   const st = $('stage');

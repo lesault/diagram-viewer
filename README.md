@@ -26,6 +26,10 @@ Built for large dataflow diagrams (for example, a cybersecurity services map dra
 
 Lineage follows arrow direction. A connector with no arrowheads is treated as two-way.
 
+### Connection counts
+
+Any shape can show a small badge with its connector counts (`in 3 · out 5`). Pin the shape and tick **Show counts on this shape** in the details panel (or press `c`), or tick **Counts on all shapes** in the Shapes tab. A shape can also opt in from the file: give it a `show_counts` property set to `1` in draw.io (Edit Data). Counts always come from the full diagram, so in a service view they show how many connections a shape has beyond the ones drawn. Badges appear in the diagram, the preview and every export (SVG, PNG, PDF, and as a small label shape in the draw.io file). Two-way and arrowless connectors count in both directions.
+
 ### Layers
 
 Complex draw.io files often keep different things on different layers (zones, services, one layer per kind of flow, notes). The **Layers** tab lists them:

@@ -62,3 +62,8 @@ export function shortestPath(graph, a, b) {
   for (let c = b; c; ) { nodes.unshift(c); const p = prev.get(c); if (p) edges.unshift(p.edge.id); c = p ? p.id : null; }
   return { nodes, edges };
 }
+
+/** Connectors arriving at / leaving a shape (an undirected or two-way connector counts in both). */
+export function countConnections(graph, id) {
+  return { in: graph.inn.has(id) ? graph.inn.get(id).length : 0, out: graph.out.has(id) ? graph.out.get(id).length : 0 };
+}
