@@ -1,7 +1,7 @@
 // Concatenate src modules + vendored libs into one self-contained dist/viewer.html (no bundler).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const r = p => readFileSync(new URL(p, import.meta.url), 'utf8');
-const order = ['xml', 'loader', 'model', 'graph', 'subset', 'render', 'tidy', 'export'];
+const order = ['xml', 'loader', 'model', 'graph', 'context', 'subset', 'render', 'router', 'tidy', 'diagnose', 'export'];
 const strip = s => s.replace(/^import .*?;\s*$/gm, '').replace(/^export (async function|function|const|class)/gm, '$1');
 const noClose = s => s.replace(/<\/script/gi, '<\\/script');   // keep inline <script> bodies intact
 

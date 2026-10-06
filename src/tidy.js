@@ -1,4 +1,4 @@
-import { findLanes } from './subset.js';
+import { findLanes, layoutZones } from './subset.js';
 import { orthoPath, defaultSides, sideMid } from './render.js';
 
 /**
@@ -10,6 +10,11 @@ export async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, f
   const lanes = findLanes(sub);
   if (lanes) return tidyLanes(sub, lanes, ELK, { spacing, focus });
   const nodes = new Map([...sub.nodes].map(([k, v]) => [k, { ...v }]));
+  // zones become temporary compound nodes so ELK keeps their members together; frames are laid out from the result
+  if (sub.zones && sub.zones.length) {
+    for (const z of sub.zones) nodes.set('zone:' + z.id, { id: 'zone:' + z.id, synthetic: true, isGroup: true, isContainer: true, parent: z.parent ? 'zone:' + z.parent : null, x: 0, y: 0, w: 0, h: 0, style: {}, meta: {}, text: '', order: -1 });
+    for (const n of nodes.values()) if (!n.synthetic && !n.parent && sub.zoneOf && sub.zoneOf.has(n.id)) n.parent = 'zone:' + sub.zoneOf.get(n.id);
+  }
   const childrenOf = new Map();
   for (const n of nodes.values()) {
     const p = n.parent && nodes.has(n.parent) ? n.parent : null;
@@ -63,7 +68,10 @@ export async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, f
     }
     outEdges.push(e);
   }
-  return { nodes, edges: outEdges, groups: sub.groups, diagnostics: sub.diagnostics, focus };
+  for (const [id, n] of [...nodes]) { if (n.synthetic) nodes.delete(id); else n.parent = sub.nodes.get(id).parent; }
+  const out = { nodes, edges: outEdges, groups: sub.groups, diagnostics: sub.diagnostics, focus, zones: sub.zones, zoneOf: sub.zoneOf, frameMeta: sub.frameMeta, layers: sub.layers };
+  layoutZones(out, { frameMeta: sub.frameMeta !== false });
+  return out;
 }
 
 // ---------- swimlane-aware tidy ----------
@@ -87,7 +95,7 @@ async function tidyLanes(sub, { blocks, axis }, ELK, { spacing, focus }) {
   const m = {
     nodes: new Map([...sub.nodes].map(([k, v]) => [k, { ...v }])),
     edges: sub.edges.filter(e => e.source && e.target).map(e => ({ ...e, route: null, points: [] })),
-    groups: sub.groups, diagnostics: sub.diagnostics, focus,
+    groups: sub.groups, diagnostics: sub.diagnostics, focus, zones: sub.zones, zoneOf: sub.zoneOf, frameMeta: sub.frameMeta, layers: sub.layers,
   };
   const keep = new Set();
   blocks.forEach(b => { if (b.pool) keep.add(b.pool.id); b.lanes.forEach(l => keep.add(l.id)); });
@@ -170,6 +178,7 @@ async function tidyLanes(sub, { blocks, axis }, ELK, { spacing, focus }) {
 
   routeLaneEdges(m, leaves, layerOf, layerX, lw, gapX);
   if (axis === 'col') transposeModel(m);
+  layoutZones(m, { frameMeta: sub.frameMeta !== false });
   return m;
 }
 

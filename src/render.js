@@ -3,7 +3,7 @@ import { depthSorted } from './subset.js';
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const color = (v, d) => (v === undefined || v === 'default' ? d : v);
 
-function wrapLines(text, maxW, fs) {
+export function wrapLines(text, maxW, fs) {
   const cw = fs * 0.56, maxChars = Math.max(3, Math.floor(maxW / cw));
   const lines = [];
   for (const para of String(text).split('\n')) {
@@ -42,12 +42,12 @@ function shapeKind(s) {
   return 'rect';
 }
 
-function nodeSVG(n) {
+function nodeSVG(n, emph = false) {
   const s = n.style, k = n.isGroup && !s.swimlane ? 'group' : shapeKind(s);
   const { x, y, w, h } = n;
   const fill = k === 'group' ? color(s.fillColor, 'none') : color(s.fillColor, '#ffffff');
   const stroke = color(s.strokeColor, '#000000');
-  const sw = +s.strokeWidth || 1;
+  const sw = emph ? Math.max(3, (+s.strokeWidth || 1) + 2) : +s.strokeWidth || 1;
   const dash = s.dashed === '1' ? ` stroke-dasharray="${(s.dashPattern || '6 4').replace(/ /g, ' ')}"` : '';
   const attrs = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash}`;
   let body = '', custom = null, labelBox = { cx: x + w / 2, cy: y + h / 2, w: w - 8 }, top = false;
@@ -74,7 +74,7 @@ function nodeSVG(n) {
   }
   const st = k === 'group' ? { ...s, align: 'left' } : s;
   const label = custom !== null ? custom : textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
-  return `<g class="n${n.isGroup ? ' grp' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
+  return `<g class="n${n.isGroup || n.ctxBox ? ' grp' : ''}${emph ? ' focus-shape' : ''}${n.ctxBox ? ' ctx' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
 }
 
 // ---- edge routing ----
@@ -173,7 +173,7 @@ function edgeSVG(e, nodes) {
   const pts = routeEdge(e, nodes);
   if (pts.length < 2) return '';
   const s = e.style, stroke = color(s.strokeColor, '#000000'), sw = +s.strokeWidth || 1;
-  const dash = s.dashed === '1' || e.inferred ? ' stroke-dasharray="6 4"' : '';
+  const dash = s.dashed === '1' || e.inferred || !e.source || !e.target ? ' stroke-dasharray="6 4"' : '';
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
   const size = 8 + sw;
   let heads = '';
@@ -192,23 +192,65 @@ function edgeSVG(e, nodes) {
   return `<g class="e" data-id="${esc(e.id)}"><path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}"${dash} stroke-linejoin="round"/>${heads}${label}</g>`;
 }
 
+const estW = (t, fs, k = 0.58) => String(t).length * fs * k;
+
+function frameSVG(f) {
+  const s = f.style || {};
+  const fill = color(s.fillColor, '#f3f4f6'), stroke = color(s.strokeColor, '#8a8f98');
+  const dash = s.dashed === '0' ? '' : ' stroke-dasharray="6 4"';
+  const ink = color(s.fontColor, '#2b2f36');
+  const lines = f.lines.map((l, i) => `<text x="${(f.x + 10).toFixed(1)}" y="${(f.y + 30 + i * 12).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="10" fill="#5b616b">${esc(l)}</text>`).join('');
+  return `<g class="z" data-zone="${esc(f.id)}"><rect x="${f.x.toFixed(1)}" y="${f.y.toFixed(1)}" width="${f.w.toFixed(1)}" height="${f.h.toFixed(1)}" rx="8" fill="${fill}" fill-opacity="0.3" stroke="${stroke}" stroke-width="1.5"${dash}/>`
+    + `<text x="${(f.x + 10).toFixed(1)}" y="${(f.y + 16).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="bold" fill="${ink}">${esc(f.title)}</text>${lines}</g>`;
+}
+
 export function bounds(model, margin = 20) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
   for (const n of model.nodes.values()) { add(n.x, n.y); add(n.x + n.w, n.y + n.h); }
+  for (const f of model.frames || []) { add(f.x, f.y); add(f.x + f.w, f.y + f.h); }
   for (const e of model.edges) for (const p of routeEdge(e, model.nodes)) add(p.x, p.y);
   if (x0 === Infinity) { x0 = y0 = 0; x1 = y1 = 100; }
   return { x: x0 - margin, y: y0 - margin, w: x1 - x0 + 2 * margin, h: y1 - y0 + 2 * margin };
 }
 
-/** Render a model to an SVG string. `standalone` adds xmlns, width/height and a white background. */
-export function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff' } = {}) {
-  const b = bounds(model, margin);
+/**
+ * Render a model to an SVG string. `standalone` adds xmlns, width/height and a background.
+ * heading: {title, subtitle} adds a title block above the diagram so it reads without the main diagram.
+ * focusId: emphasise one shape (the service the view is about).
+ */
+export function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff', heading = null, focusId = null } = {}) {
+  let b = bounds(model, margin);
   const nodes = depthSorted(model);
-  const body = nodes.filter(n => n.isGroup).map(nodeSVG).join('') + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + nodes.filter(n => !n.isGroup).map(nodeSVG).join('');
+  const li = new Map((model.layers || []).map((l, i) => [l.id, i]));
+  const lay = n => (li.has(n.layer) ? li.get(n.layer) : 0);
+  const back = nodes.filter(n => n.isGroup || n.ctxBox).sort((p, q) => lay(p) - lay(q) || (p.ctxBox && q.ctxBox ? q.w * q.h - p.w * p.h : 0));
+  const front = nodes.filter(n => !n.isGroup && !n.ctxBox);
+
+  let head = '';
+  if (heading && (heading.title || heading.subtitle)) {
+    const tfs = 20, sfs = 12, maxW = Math.max(b.w - 2 * margin, 560);
+    const tl = heading.title ? wrapLines(heading.title, maxW, tfs * 1.08) : [], sl = heading.subtitle ? wrapLines(heading.subtitle, maxW, sfs) : [];
+    const widest = Math.max(0, ...tl.map(l => estW(l, tfs, 0.6)), ...sl.map(l => estW(l, sfs)));
+    if (widest + 2 * margin > b.w) b = { ...b, w: widest + 2 * margin };
+    const hh = 14 + tl.length * (tfs + 6) + (sl.length ? 4 + sl.length * (sfs + 4) : 0) + 14;
+    const top = b.y - hh, x = b.x + margin;
+    let y = top + 12;
+    const parts = [];
+    tl.forEach(l => { y += tfs + 6; parts.push(`<text x="${x}" y="${(y - 6).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="${tfs}" font-weight="bold" fill="#1d2430">${esc(l)}</text>`); });
+    sl.forEach(l => { y += sfs + 4; parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="${sfs}" fill="#5b616b">${esc(l)}</text>`); });
+    const ry = (top + hh - 8).toFixed(1);
+    parts.push(`<line x1="${x}" y1="${ry}" x2="${(b.x + b.w - margin).toFixed(1)}" y2="${ry}" stroke="#c9cdd3"/>`);
+    head = `<g class="heading">${parts.join('')}</g>`;
+    b = { x: b.x, y: top, w: b.w, h: b.h + hh };
+  }
+
+  const body = back.map(n => nodeSVG(n)).join('') + (model.frames || []).map(frameSVG).join('')
+    + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + front.map(n => nodeSVG(n, n.id === focusId)).join('');
   const vb = `${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}`;
-  const head = standalone
-    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}">${title ? `<title>${esc(title)}</title>` : ''}<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${background}"/>`
+  const bg = standalone && background && background !== 'none' ? `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${background}"/>` : '';
+  const top = standalone
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}">${title ? `<title>${esc(title)}</title>` : ''}${bg}`
     : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" id="canvas">`;
-  return { svg: `${head}${body}</svg>`, bounds: b };
+  return { svg: `${top}${head}${body}</svg>`, bounds: b };
 }

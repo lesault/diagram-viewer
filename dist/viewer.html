@@ -1,61 +1,92 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lineage Viewer</title>
-<style>:root{--bg:#f4f5f7;--panel:#fff;--ink:#1d2430;--mute:#6b7380;--line:#d9dde3;--accent:#2563eb;--hl:#e11d48}
-@media(prefers-color-scheme:dark){:root{--bg:#14171c;--panel:#1c2027;--ink:#e6e9ef;--mute:#9aa3b2;--line:#2d333d;--accent:#6ea0ff;--hl:#ff5c7c}}
+<style>:root{--bg:#f4f5f7;--panel:#fff;--ink:#1d2430;--mute:#6b7380;--line:#d9dde3;--accent:#2563eb;--accent-ink:#fff;--hl:#e11d48;--err:#d92d20;--warn:#d98a00;--info:#2e90fa;color-scheme:light}
+:root[data-theme="dark"]{--bg:#14171c;--panel:#1c2027;--ink:#e6e9ef;--mute:#9aa3b2;--line:#2d333d;--accent:#6ea0ff;--accent-ink:#0b1220;--hl:#ff5c7c;--err:#ff6b5e;--warn:#f5b73b;--info:#6cb6ff;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
-header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header{display:flex;align-items:center;gap:8px 12px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.grp{display:flex;align-items:center;gap:8px}
 .brand{margin-right:6px}.sp{flex:1}
-button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
+button,select,input[type=text],input[type=search]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}
+select{padding:4px 6px}
 button:hover:not(:disabled){border-color:var(--accent)}button:disabled{opacity:.45;cursor:default}
 button.ghost{background:transparent}
+button.on-state{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .seg{display:inline-flex}.seg button{border-radius:0;margin-left:-1px}.seg button:first-child{border-radius:6px 0 0 6px;margin:0}.seg button:last-child{border-radius:0 6px 6px 0}
-.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.ctl{display:inline-flex;align-items:center;gap:6px}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ctl{display:inline-flex;align-items:center;gap:6px}.ctl.full{display:flex;margin:8px 0}.ctl.full select{flex:1}
 #depthOut{min-width:1.2em;text-align:center;font-weight:600}
-#tabs{display:flex;gap:4px}#tabs button.on{border-color:var(--accent);color:var(--accent)}
-main{flex:1;display:grid;grid-template-columns:240px 1fr 300px;min-height:0}
+#tabs{display:flex;gap:4px;flex-wrap:wrap}#tabs button.on{border-color:var(--accent);color:var(--accent)}
+main{flex:1;display:grid;grid-template-columns:300px 1fr 300px;min-height:0}
 aside{background:var(--panel);overflow:auto;padding:8px;min-height:0}
 #left{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 #right{border-left:1px solid var(--line)}
-#search{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.ltabs{display:flex;gap:4px}.ltabs button{flex:1;padding:4px 6px}.ltabs button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tab{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1;overflow:auto}
+.tab[hidden]{display:none}
+.badge{display:inline-block;min-width:1.6em;padding:0 5px;border-radius:9px;background:var(--err);color:#fff;font-size:11px;text-align:center}
+#search{width:100%;background:var(--bg)}
 #list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
 #list li{padding:4px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#list li:hover{background:var(--bg)}#list li.sel{background:var(--accent);color:#fff}
+#list li:hover{background:var(--bg)}#list li.sel{background:var(--accent);color:var(--accent-ink)}
 #stage{position:relative;overflow:hidden;background:var(--bg)}
 #canvasHost,#canvasHost svg{width:100%;height:100%;display:block}
 #canvasHost svg{background:#fff;cursor:grab;user-select:none}
 #canvasHost svg.drag{cursor:grabbing}
+:root[data-theme="dark"][data-invert="1"] #canvasHost svg{filter:invert(.93) hue-rotate(180deg)}
+:root[data-theme="dark"][data-invert="0"] #canvasHost svg{background:#fff}
+#invertWrap{display:none}:root[data-theme="dark"] #invertWrap{display:inline-flex}
 #empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--mute);pointer-events:none}
 #stage.dropping{outline:3px dashed var(--accent);outline-offset:-8px}
-#banner{position:absolute;left:12px;top:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-weight:600}
+#banner{position:absolute;left:12px;top:12px;max-width:60%;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-weight:600}
+#viewbar{position:absolute;right:12px;top:12px;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 18px #0003}
+#viewbar .vb-head{display:flex;justify-content:space-between;align-items:center}
+#viewbar input[type=text]{width:100%}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px}.opts label,.check{display:flex;gap:6px;align-items:center}
 #zoombar{position:absolute;right:12px;bottom:12px}
 .hint{color:var(--mute);margin:.3em 0}
 /* focus / dimming */
 svg .n,svg .e{transition:opacity .08s}
 svg.focus .n:not(.hl),svg.focus .e:not(.hl){opacity:.1}
+svg.focus .z{opacity:.35}
 svg.focus .n.hl.f>:first-child{stroke:var(--hl);stroke-width:3}
 svg .n.blk>:first-child{stroke-dasharray:3 3}
 svg .n:not(.grp){cursor:pointer}svg .grp{pointer-events:none}
 svg .e path{pointer-events:none}
+svg .dx>:first-child{stroke:#e11d48!important;stroke-width:3!important}
+svg .e.dx path{stroke:#e11d48!important;stroke-width:3!important}
+svg .e.dx polygon{fill:#e11d48!important;stroke:#e11d48!important}
 h4{margin:.8em 0 .3em;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
 #details h3{margin:.2em 0}
 table{border-collapse:collapse;width:100%}td{padding:2px 4px;border-bottom:1px solid var(--line);vertical-align:top}td:first-child{color:var(--mute);width:38%}
 .lin{list-style:none;padding:0;margin:0}.lin li{padding:2px 0;cursor:pointer}.lin li:hover{color:var(--accent)}
 .lin small{color:var(--mute)}
-dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:16px;max-width:460px}
+.zone{border-left:3px solid var(--line);padding-left:8px;margin:4px 0}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:16px;max-width:520px}
 dialog::backdrop{background:#0006}
 dialog label{display:block;margin:6px 0}dialog fieldset{border:1px solid var(--line);border-radius:6px;margin:8px 0}
-dialog fieldset label{display:inline-block;margin-right:12px}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-#diag summary{cursor:pointer}#diag ul{padding-left:16px;margin:4px 0}#diag li{cursor:pointer}
-@media(max-width:900px){main{grid-template-columns:1fr}aside{display:none}}
+dialog input[type=text]{width:100%;margin:2px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.row2{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.row2 label{margin:0}
+/* layers + checks */
+.lrow{border-bottom:1px solid var(--line);padding:6px 0}.lrow .name{display:flex;gap:6px;align-items:center;font-weight:600}.lrow small{color:var(--mute);display:block;margin-left:22px}
+.lrow .frame{margin-left:22px;display:flex;gap:6px;align-items:center;color:var(--mute)}.lrow em{color:var(--accent);font-style:normal;font-size:11px}
+#chkSummary{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600;color:#fff}.chip.error{background:var(--err)}.chip.warn{background:var(--warn);color:#111}.chip.info{background:var(--info);color:#06223f}
+#checkList details{border-bottom:1px solid var(--line);padding:4px 0}
+#checkList summary{cursor:pointer;display:flex;gap:6px;align-items:baseline}
+#checkList summary b{margin-left:auto;color:var(--mute)}
+.sev{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}.sev.error{background:var(--err)}.sev.warn{background:var(--warn)}.sev.info{background:var(--info)}
+#checkList ul{list-style:none;margin:4px 0;padding:0}#checkList li{padding:2px 4px;border-radius:4px;cursor:pointer}#checkList li:hover{background:var(--bg)}
+#checkList li small{color:var(--mute);display:block}
 [hidden]{display:none!important}
+@media(max-width:1000px){main{grid-template-columns:1fr}aside{display:none}}
+#viewbar.collapsed>:not(.vb-head){display:none}#viewbar .vb-head strong{cursor:pointer}
 </style>
 </head>
 <body>
@@ -66,46 +97,92 @@ dialog fieldset label{display:inline-block;margin-right:12px}
   <input id="file" type="file" accept=".drawio,.xml,.dio" hidden>
   <div id="tabs"></div>
   <span class="sp"></span>
-  <div class="ctl" title="Which direction to follow from the hovered shape (u / d / b)">
-    <span class="seg" id="dir">
+  <div class="grp">
+    <span class="seg" id="dir" title="Which direction to follow from the shape (u / d / b)">
       <button data-v="up">Upstream</button><button data-v="both" class="on">Both</button><button data-v="down">Downstream</button>
     </span>
+    <label class="ctl" title="Hops from the shape (keys 1-9)">Hops
+      <input id="depth" type="range" min="1" max="8" value="2"><output id="depthOut">2</output>
+    </label>
+    <label class="ctl"><input id="inf" type="checkbox"> all</label>
   </div>
-  <label class="ctl" title="Hops from the shape (keys 1-9)">Hops
-    <input id="depth" type="range" min="1" max="8" value="2"><output id="depthOut">2</output>
-  </label>
-  <label class="ctl"><input id="inf" type="checkbox"> all</label>
-  <button id="preview" disabled title="Show the isolated service view on its own">Preview view</button>
-  <button id="export" disabled>Export…</button>
+  <div class="grp">
+    <button id="tidy" disabled title="Reroute connectors around shapes to avoid overlaps and detours (shapes do not move)">Tidy connectors</button>
+    <button id="preview" disabled title="Show the isolated service view as its own diagram">Preview view</button>
+    <button id="export" disabled>Export…</button>
+  </div>
+  <div class="grp">
+    <select id="theme" title="Colour theme"><option value="auto">Theme: auto</option><option value="light">Light</option><option value="dark">Dark</option></select>
+    <label class="ctl" id="invertWrap" title="In dark mode, also invert the diagram's own colours"><input id="invert" type="checkbox" checked> invert diagram</label>
+  </div>
 </header>
 <main>
   <aside id="left">
-    <input id="search" type="search" placeholder="Search shapes & metadata…">
-    <ul id="list"></ul>
-    <details id="diag"><summary>Diagnostics</summary><div id="diagBody"></div></details>
+    <div class="ltabs">
+      <button data-tab="shapes" class="on">Shapes</button><button data-tab="layers">Layers</button><button data-tab="checks">Checks <span id="chkBadge" class="badge" hidden></span></button>
+    </div>
+    <section id="tab-shapes" class="tab">
+      <input id="search" type="search" placeholder="Search shapes & properties…">
+      <ul id="list"></ul>
+    </section>
+    <section id="tab-layers" class="tab" hidden>
+      <p class="hint">Tick <b>show</b> to display a layer. Tick <b>frame</b> on layers whose boxes contain shapes from other layers (zones, networks, regions): in service views those boxes are kept as labelled frames around the shapes they contain.</p>
+      <div id="layerList"></div>
+    </section>
+    <section id="tab-checks" class="tab" hidden>
+      <div id="chkSummary"></div>
+      <label class="ctl full">Check property <select id="metaKey"><option value="">(none)</option></select></label>
+      <div class="row"><button id="chkRun">Re-run</button><button id="chkMd" class="ghost">Report (.md)</button><button id="chkCsv" class="ghost">CSV</button></div>
+      <div id="checkList"></div>
+    </section>
   </aside>
   <section id="stage">
     <div id="canvasHost"></div>
     <div id="empty"><p>Drop a <b>.drawio</b> file here, or use <b>Open</b>.</p><p class="hint">Hover a shape to isolate its lineage · click to pin · right-click to stop traversal through a hub · Esc to clear</p></div>
     <div id="banner" hidden></div>
+    <div id="viewbar" hidden>
+      <div class="vb-head"><strong id="vbTitle" title="Click to collapse">Service view ▾</strong><button id="vbBack" class="ghost">Back to diagram</button></div>
+      <label class="check"><input type="checkbox" id="oHeading" checked> Heading</label>
+      <input id="oTitle" type="text" placeholder="Title">
+      <input id="oSubtitle" type="text" placeholder="Subtitle">
+      <p class="hint">Tokens: {service} {direction} {hops} {file} {page} {date}</p>
+      <div class="opts">
+        <label><input type="checkbox" id="oTidy" checked> Tidy layout</label>
+        <label><input type="checkbox" id="oLanes" checked> Keep swimlanes</label>
+        <label><input type="checkbox" id="oZones" checked> Zone frames</label>
+        <label><input type="checkbox" id="oZoneMeta" checked> Zone properties</label>
+        <label><input type="checkbox" id="oFocus" checked> Highlight service</label>
+      </div>
+      <div class="row"><button id="vbExport">Export…</button></div>
+    </div>
     <div id="zoombar"><button id="fit">Fit</button></div>
   </section>
   <aside id="right"><div id="details"><p class="hint">Hover or select a shape to see its inputs and outputs.</p></div></aside>
 </main>
 <dialog id="dlg">
   <form method="dialog" id="exportForm">
-    <h3>Export service view</h3>
-    <p id="dlgScope" class="hint"></p>
-    <label><input type="checkbox" id="optTidy" checked> Tidy layout (re-flow as a standalone diagram)</label>
-    <label><input type="checkbox" id="optZones" checked> Keep zones / containers</label>
-    <fieldset><legend>Formats</legend>
-      <label><input type="checkbox" id="fSvg" checked> SVG</label>
-      <label><input type="checkbox" id="fPng" checked> PNG (2×)</label>
-      <label><input type="checkbox" id="fDio" checked> draw.io</label>
+    <h3>Export</h3>
+    <fieldset><legend>What</legend>
+      <label><input type="radio" name="scope" value="view" checked> <span id="scopeView">This service view</span></label>
+      <label><input type="radio" name="scope" value="whole"> Whole diagram (as shown, with tidied connectors)</label>
     </fieldset>
+    <div id="wholeHeading" hidden>
+      <input id="wTitle" type="text" placeholder="Title"><input id="wSubtitle" type="text" placeholder="Subtitle">
+    </div>
+    <fieldset><legend>Formats</legend>
+      <label><input type="checkbox" id="fPng" checked> Image — PNG</label>
+      <label><input type="checkbox" id="fSvg" checked> Vector — SVG</label>
+      <label><input type="checkbox" id="fPdf"> Vector — PDF <small>(opens the print dialog: choose “Save as PDF”)</small></label>
+      <label><input type="checkbox" id="fDio" checked> Editable — draw.io</label>
+    </fieldset>
+    <div class="row2">
+      <label>Image size <select id="fScale"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></label>
+      <label>Background <select id="fBg"><option value="#ffffff">White</option><option value="none">Transparent</option></select></label>
+      <label><input type="checkbox" id="dHeading" checked> Heading</label>
+    </div>
     <div class="row">
-      <button type="button" id="doExport">Export current view</button>
-      <button type="button" id="doBatch" title="One file set per shape (matching the search filter), zipped">Export all services (.zip)</button>
+      <button type="button" id="doExport">Export</button>
+      <button type="button" id="doBatch" title="One file set per shape (matching the search filter), zipped. PDF is skipped.">Export all services (.zip)</button>
       <button value="cancel" class="ghost">Close</button>
     </div>
     <p id="dlgMsg" class="hint"></p>
@@ -6870,7 +6947,7 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
     const style = a.style || '';
     const sm = parseStyle(style);
     cells.set(id, {
-      id, parent: a.parent, vertex: a.vertex === '1', edge: a.edge === '1',
+      id, parent: a.parent, vertex: a.vertex === '1', edge: a.edge === '1', visible: a.visible !== '0',
       source: a.source, target: a.target, styleStr: style, style: sm,
       raw: label !== null ? label : (a.value || el.attrs.label || ''), meta,
       geo: geo ? { x: num(geo.attrs.x), y: num(geo.attrs.y), w: num(geo.attrs.width), h: num(geo.attrs.height), relative: geo.attrs.relative === '1', ...ptsOf(geo) } : null,
@@ -6882,6 +6959,16 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
     let x = 0, y = 0, c = cells.get(id), guard = 0;
     while (c && c.vertex && guard++ < 100) { x += c.geo ? c.geo.x : 0; y += c.geo ? c.geo.y : 0; c = cells.get(c.parent); }
     return { x, y };
+  };
+
+  // layers are the cells whose parent is the root cell; every other cell belongs to the layer at the top of its parent chain
+  const layers = [...cells.values()].filter(c => c.parent === '0' && !c.vertex && !c.edge && c.id !== '0')
+    .map((c, i) => ({ id: c.id, name: (c.raw || '').trim() || `Layer ${i + 1}`, visible: c.visible, order: i, nodes: 0, edges: 0 }));
+  const layerIds = new Set(layers.map(l => l.id));
+  const layerOfCell = id => {
+    let c = cells.get(id), guard = 0;
+    while (c && guard++ < 200) { if (layerIds.has(c.id)) return c.id; c = cells.get(c.parent); }
+    return layers.length ? layers[0].id : null;
   };
 
   const diagnostics = { inferredEdges: [], danglingEdges: [], unconnected: [], duplicateLabels: [] };
@@ -6901,7 +6988,7 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
       x: (v.geo ? v.geo.x : 0) + o.x, y: (v.geo ? v.geo.y : 0) + o.y,
       w: v.geo ? v.geo.w : 80, h: v.geo ? v.geo.h : 40,
       parent: cells.get(v.parent) && cells.get(v.parent).vertex ? v.parent : null,
-      isContainer: childOfVertex.has(v.id), order: nodes.size,
+      isContainer: childOfVertex.has(v.id), order: nodes.size, layer: layerOfCell(v.id),
     });
   }
 
@@ -6936,14 +7023,14 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
     if (!source) { const s = snap(shift(g.src) || points[0]); if (s) { source = s; inferred = true; } }
     if (!target) { const t = snap(shift(g.tgt) || points[points.length - 1]); if (t) { target = t; inferred = true; } }
     const e = {
-      id: c.id, source, target, style: c.style, styleStr: c.styleStr, points, inferred,
+      id: c.id, layer: layerOfCell(c.id), source, target, style: c.style, styleStr: c.styleStr, points, inferred,
       srcPoint: shift(g.src), tgtPoint: shift(g.tgt),
       label: htmlToText(c.raw, c.style.html === '1') || edgeLabelFor.get(c.id) || '', rawLabel: c.raw, meta: c.meta || {},
     };
     const fwd = c.style.endArrow !== 'none', back = c.style.startArrow !== undefined && c.style.startArrow !== 'none';
     e.fwd = fwd; e.back = back;
     e.undirected = !fwd && !back;
-    if (!source || !target) { diagnostics.danglingEdges.push(e.id); if (!source && !target) continue; }
+    if (!source || !target) diagnostics.danglingEdges.push(e.id);   // kept (drawn dashed) but ignored by lineage
     if (inferred) diagnostics.inferredEdges.push(e.id);
     edges.push(e);
   }
@@ -6966,7 +7053,10 @@ function buildModel(graphEl, { snapTolerance = 24 } = {}) {
   for (const [t, ids] of labels) if (ids.length > 1) diagnostics.duplicateLabels.push({ label: t, ids });
 
   // drop edges whose only resolved end is a group-less ghost; keep the rest
-  return { nodes, edges, groups, diagnostics };
+  const layerById = new Map(layers.map(l => [l.id, l]));
+  for (const n of nodes.values()) { const l = layerById.get(n.layer); if (l && !n.isGroup) l.nodes++; }
+  for (const e of edges) { const l = layerById.get(e.layer); if (l) l.edges++; }
+  return { nodes, edges, groups, layers, diagnostics };
 }
 
 // Direction-aware lineage over a normalised model.
@@ -7034,8 +7124,80 @@ function shortestPath(graph, a, b) {
   return { nodes, edges };
 }
 
+// Layer handling: visibility filtering, and "context" layers whose boxes frame the shapes they contain.
+
+const centre = n => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
+const within = (p, r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+const area = n => n.w * n.h;
+
+/**
+ * Layers worth framing sub-views with: no connectors of their own, and at least one shape whose
+ * rectangle contains the centre of a shape on another layer (e.g. network zones drawn behind services).
+ */
+function suggestContextLayers(model) {
+  const out = [];
+  for (const l of model.layers || []) {
+    if (l.edges) continue;
+    const mine = [...model.nodes.values()].filter(n => n.layer === l.id && !n.style.text);
+    const others = [...model.nodes.values()].filter(n => n.layer !== l.id && !n.isGroup);
+    if (mine.some(b => others.some(o => within(centre(o), b)))) out.push(l.id);
+  }
+  return out;
+}
+
+/**
+ * A copy of the model restricted to visible layers. Connectors whose end shapes are on hidden layers are dropped
+ * (connectors that were already unattached are kept). Shapes on context layers that have no connectors are flagged
+ * `ctxBox`: they are drawn behind everything, ignored by lineage, and used as zone frames in sub-views.
+ */
+function filterLayers(model, { hidden = new Set(), context = new Set() } = {}) {
+  const vis = id => !hidden.has(id);
+  const nodes = new Map();
+  for (const [id, n] of model.nodes) if (vis(n.layer)) nodes.set(id, { ...n, ctxBox: false });
+  const edges = [];
+  for (const e of model.edges) {
+    if (!vis(e.layer)) continue;
+    if ((e.source && model.nodes.has(e.source) && !nodes.has(e.source)) || (e.target && model.nodes.has(e.target) && !nodes.has(e.target))) continue;
+    edges.push({ ...e });
+  }
+  const attached = new Set();
+  for (const e of edges) { if (e.source) attached.add(e.source); if (e.target) attached.add(e.target); }
+  for (const n of nodes.values()) {
+    n.ctxBox = context.has(n.layer) && !n.isGroup && !attached.has(n.id) && !n.style.text;
+    if (n.ctxBox) n.isContainer = false;
+  }
+  const groups = new Map([...nodes].filter(([, n]) => n.isGroup));
+  return { nodes, edges, groups, layers: model.layers, diagnostics: model.diagnostics };
+}
+
+/**
+ * Zone membership by geometry. A leaf shape is inside a zone when its centre is inside the zone box; zones nest by the
+ * same rule (smallest enclosing box is the parent).
+ * Returns { zones: Map<id, {id,node,members:Set,parent,children:[]}>, zoneOf: Map<nodeId, innermostZoneId>, chain(nodeId) }.
+ */
+function computeZones(model) {
+  const boxes = [...model.nodes.values()].filter(n => n.ctxBox).sort((a, b) => area(a) - area(b));
+  const leaves = [...model.nodes.values()].filter(n => !n.isGroup && !n.ctxBox && !n.isContainer);
+  const zones = new Map(boxes.map(b => [b.id, { id: b.id, node: b, members: new Set(), parent: null, children: [] }]));
+  for (let i = 0; i < boxes.length; i++) {
+    const b = boxes[i], c = centre(b);
+    for (let j = i + 1; j < boxes.length; j++) {
+      const o = boxes[j];
+      if (area(o) > area(b) && within(c, o)) { zones.get(b.id).parent = o.id; zones.get(o.id).children.push(b.id); break; }
+    }
+  }
+  const zoneOf = new Map();
+  const chain = id => { const out = []; for (let z = zoneOf.get(id); z; z = zones.get(z).parent) out.push(z); return out; };
+  for (const n of leaves) {
+    const c = centre(n), inner = boxes.find(b => within(c, b));
+    if (inner) zoneOf.set(n.id, inner.id);
+  }
+  for (const n of leaves) for (const z of chain(n.id)) zones.get(z).members.add(n.id);
+  return { zones, zoneOf, chain };
+}
+
 // Build a standalone sub-model (selected nodes + their ancestor containers + the chosen edges).
-function subModel(model, nodeIds, edgeIds, { fitGroups = true, keepGroups = true } = {}) {
+function subModel(model, nodeIds, edgeIds, { fitGroups = true, keepGroups = true, zones = null, frameMeta = true } = {}) {
   const nodes = new Map();
   const want = new Set(nodeIds);
   const clone = n => ({ ...n });
@@ -7060,6 +7222,21 @@ function subModel(model, nodeIds, edgeIds, { fitGroups = true, keepGroups = true
     if (n.isGroup) out.groups.set(n.id, n);
   }
   if (fitGroups) fitContainers(out);
+
+  // zone frames: boxes from "context" layers that contain selected shapes (membership by geometry, computed in context.js)
+  if (zones) {
+    const incl = new Map();
+    for (const id of want) for (const z of zones.chain(id)) { if (!incl.has(z)) incl.set(z, new Set()); incl.get(z).add(id); }
+    out.zones = [...incl].map(([zid, members]) => {
+      let p = zones.zones.get(zid).parent;
+      while (p && !incl.has(p)) p = zones.zones.get(p).parent;
+      const b = zones.zones.get(zid).node;
+      return { id: zid, text: b.text, style: b.style, styleStr: b.styleStr, meta: b.meta, raw: b.raw, members, parent: p };
+    });
+    out.zoneOf = new Map([...want].filter(id => zones.zoneOf.has(id)).map(id => [id, zones.zoneOf.get(id)]));
+  }
+  out.frameMeta = frameMeta;
+  layoutZones(out, { frameMeta });
   return out;
 }
 
@@ -7120,6 +7297,41 @@ function fitLaneBlock(m, { pool, lanes }, axis, pad) {
   if (pool) { const ph = +pool.style.startSize || 23; pool[R.al] = A0 - ph; pool[R.az] = A1 - A0 + ph; pool[R.st] = bound[0]; pool[R.sz] = bound[live.length] - bound[0]; }
 }
 
+const textW = (t, fs) => String(t).length * fs * 0.58;
+
+/**
+ * Compute zone frames from the current node positions: each frame wraps its member shapes (and its child frames)
+ * with padding, plus a header for the zone's name and (optionally) its properties. Call again after any re-layout.
+ */
+function layoutZones(m, { frameMeta = true, pad = 14 } = {}) {
+  const zs = m.zones || [];
+  m.frames = [];
+  if (!zs.length) return m.frames;
+  const byId = new Map(zs.map(z => [z.id, z]));
+  const kids = new Map(zs.map(z => [z.id, []]));
+  for (const z of zs) if (z.parent && byId.has(z.parent)) kids.get(z.parent).push(z.id);
+  const height = new Map();
+  const h = id => { if (!height.has(id)) height.set(id, kids.get(id).length ? 1 + Math.max(...kids.get(id).map(h)) : 0); return height.get(id); };
+  zs.forEach(z => h(z.id));
+  const frames = new Map();
+  for (const z of [...zs].sort((a, b) => height.get(a.id) - height.get(b.id))) {
+    const rects = [...z.members].map(id => m.nodes.get(id)).filter(Boolean);
+    for (const c of kids.get(z.id)) if (frames.has(c)) rects.push(frames.get(c));
+    if (!rects.length) continue;
+    const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y));
+    const x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.h));
+    const lines = frameMeta ? Object.entries(z.meta || {}).slice(0, 5).map(([k, v]) => `${k}: ${v}`) : [];
+    const title = String(z.text || '').split('\n')[0];
+    const head = 20 + lines.length * 12;
+    const f = { id: z.id, x: x0 - pad, y: y0 - pad - head, w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad + head, title, lines, style: z.style, depth: height.get(z.id) };
+    const need = Math.max(textW(title, 12), ...lines.map(l => textW(l, 10))) + 24;
+    if (f.w < need) { f.x -= (need - f.w) / 2; f.w = need; }
+    frames.set(z.id, f);
+  }
+  m.frames = [...frames.values()].sort((a, b) => b.depth - a.depth);   // outermost first
+  return m.frames;
+}
+
 const depthSorted = m => [...m.nodes.values()].sort((a, b) => depthOf(m.nodes, a) - depthOf(m.nodes, b) || a.order - b.order);
 
 
@@ -7165,12 +7377,12 @@ function shapeKind(s) {
   return 'rect';
 }
 
-function nodeSVG(n) {
+function nodeSVG(n, emph = false) {
   const s = n.style, k = n.isGroup && !s.swimlane ? 'group' : shapeKind(s);
   const { x, y, w, h } = n;
   const fill = k === 'group' ? color(s.fillColor, 'none') : color(s.fillColor, '#ffffff');
   const stroke = color(s.strokeColor, '#000000');
-  const sw = +s.strokeWidth || 1;
+  const sw = emph ? Math.max(3, (+s.strokeWidth || 1) + 2) : +s.strokeWidth || 1;
   const dash = s.dashed === '1' ? ` stroke-dasharray="${(s.dashPattern || '6 4').replace(/ /g, ' ')}"` : '';
   const attrs = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash}`;
   let body = '', custom = null, labelBox = { cx: x + w / 2, cy: y + h / 2, w: w - 8 }, top = false;
@@ -7197,7 +7409,7 @@ function nodeSVG(n) {
   }
   const st = k === 'group' ? { ...s, align: 'left' } : s;
   const label = custom !== null ? custom : textEl(n.text, labelBox.cx, labelBox.cy, labelBox.w, st, { top });
-  return `<g class="n${n.isGroup ? ' grp' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
+  return `<g class="n${n.isGroup || n.ctxBox ? ' grp' : ''}${emph ? ' focus-shape' : ''}${n.ctxBox ? ' ctx' : ''}" data-id="${esc(n.id)}">${body}${label}</g>`;
 }
 
 // ---- edge routing ----
@@ -7296,7 +7508,7 @@ function edgeSVG(e, nodes) {
   const pts = routeEdge(e, nodes);
   if (pts.length < 2) return '';
   const s = e.style, stroke = color(s.strokeColor, '#000000'), sw = +s.strokeWidth || 1;
-  const dash = s.dashed === '1' || e.inferred ? ' stroke-dasharray="6 4"' : '';
+  const dash = s.dashed === '1' || e.inferred || !e.source || !e.target ? ' stroke-dasharray="6 4"' : '';
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
   const size = 8 + sw;
   let heads = '';
@@ -7315,25 +7527,335 @@ function edgeSVG(e, nodes) {
   return `<g class="e" data-id="${esc(e.id)}"><path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}"${dash} stroke-linejoin="round"/>${heads}${label}</g>`;
 }
 
+const estW = (t, fs, k = 0.58) => String(t).length * fs * k;
+
+function frameSVG(f) {
+  const s = f.style || {};
+  const fill = color(s.fillColor, '#f3f4f6'), stroke = color(s.strokeColor, '#8a8f98');
+  const dash = s.dashed === '0' ? '' : ' stroke-dasharray="6 4"';
+  const ink = color(s.fontColor, '#2b2f36');
+  const lines = f.lines.map((l, i) => `<text x="${(f.x + 10).toFixed(1)}" y="${(f.y + 30 + i * 12).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="10" fill="#5b616b">${esc(l)}</text>`).join('');
+  return `<g class="z" data-zone="${esc(f.id)}"><rect x="${f.x.toFixed(1)}" y="${f.y.toFixed(1)}" width="${f.w.toFixed(1)}" height="${f.h.toFixed(1)}" rx="8" fill="${fill}" fill-opacity="0.3" stroke="${stroke}" stroke-width="1.5"${dash}/>`
+    + `<text x="${(f.x + 10).toFixed(1)}" y="${(f.y + 16).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="bold" fill="${ink}">${esc(f.title)}</text>${lines}</g>`;
+}
+
 function bounds(model, margin = 20) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
   for (const n of model.nodes.values()) { add(n.x, n.y); add(n.x + n.w, n.y + n.h); }
+  for (const f of model.frames || []) { add(f.x, f.y); add(f.x + f.w, f.y + f.h); }
   for (const e of model.edges) for (const p of routeEdge(e, model.nodes)) add(p.x, p.y);
   if (x0 === Infinity) { x0 = y0 = 0; x1 = y1 = 100; }
   return { x: x0 - margin, y: y0 - margin, w: x1 - x0 + 2 * margin, h: y1 - y0 + 2 * margin };
 }
 
-/** Render a model to an SVG string. `standalone` adds xmlns, width/height and a white background. */
-function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff' } = {}) {
-  const b = bounds(model, margin);
+/**
+ * Render a model to an SVG string. `standalone` adds xmlns, width/height and a background.
+ * heading: {title, subtitle} adds a title block above the diagram so it reads without the main diagram.
+ * focusId: emphasise one shape (the service the view is about).
+ */
+function renderSVG(model, { standalone = false, margin = 20, title = '', background = '#ffffff', heading = null, focusId = null } = {}) {
+  let b = bounds(model, margin);
   const nodes = depthSorted(model);
-  const body = nodes.filter(n => n.isGroup).map(nodeSVG).join('') + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + nodes.filter(n => !n.isGroup).map(nodeSVG).join('');
+  const li = new Map((model.layers || []).map((l, i) => [l.id, i]));
+  const lay = n => (li.has(n.layer) ? li.get(n.layer) : 0);
+  const back = nodes.filter(n => n.isGroup || n.ctxBox).sort((p, q) => lay(p) - lay(q) || (p.ctxBox && q.ctxBox ? q.w * q.h - p.w * p.h : 0));
+  const front = nodes.filter(n => !n.isGroup && !n.ctxBox);
+
+  let head = '';
+  if (heading && (heading.title || heading.subtitle)) {
+    const tfs = 20, sfs = 12, maxW = Math.max(b.w - 2 * margin, 560);
+    const tl = heading.title ? wrapLines(heading.title, maxW, tfs * 1.08) : [], sl = heading.subtitle ? wrapLines(heading.subtitle, maxW, sfs) : [];
+    const widest = Math.max(0, ...tl.map(l => estW(l, tfs, 0.6)), ...sl.map(l => estW(l, sfs)));
+    if (widest + 2 * margin > b.w) b = { ...b, w: widest + 2 * margin };
+    const hh = 14 + tl.length * (tfs + 6) + (sl.length ? 4 + sl.length * (sfs + 4) : 0) + 14;
+    const top = b.y - hh, x = b.x + margin;
+    let y = top + 12;
+    const parts = [];
+    tl.forEach(l => { y += tfs + 6; parts.push(`<text x="${x}" y="${(y - 6).toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="${tfs}" font-weight="bold" fill="#1d2430">${esc(l)}</text>`); });
+    sl.forEach(l => { y += sfs + 4; parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="Helvetica,Arial,sans-serif" font-size="${sfs}" fill="#5b616b">${esc(l)}</text>`); });
+    const ry = (top + hh - 8).toFixed(1);
+    parts.push(`<line x1="${x}" y1="${ry}" x2="${(b.x + b.w - margin).toFixed(1)}" y2="${ry}" stroke="#c9cdd3"/>`);
+    head = `<g class="heading">${parts.join('')}</g>`;
+    b = { x: b.x, y: top, w: b.w, h: b.h + hh };
+  }
+
+  const body = back.map(n => nodeSVG(n)).join('') + (model.frames || []).map(frameSVG).join('')
+    + model.edges.map(e => edgeSVG(e, model.nodes)).join('') + front.map(n => nodeSVG(n, n.id === focusId)).join('');
   const vb = `${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}`;
-  const head = standalone
-    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}">${title ? `<title>${esc(title)}</title>` : ''}<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${background}"/>`
+  const bg = standalone && background && background !== 'none' ? `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${background}"/>` : '';
+  const top = standalone
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}">${title ? `<title>${esc(title)}</title>` : ''}${bg}`
     : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" id="canvas">`;
-  return { svg: `${head}${body}</svg>`, bounds: b };
+  return { svg: `${top}${head}${body}</svg>`, bounds: b };
+}
+
+
+// Orthogonal connector router for the main diagram. Shapes stay where they are; only connectors move.
+// Each connector is routed on a grid built from the shapes' clearance lines (A* with penalties for bends,
+// for running over connectors already routed, and for crossing them), then ports are spread along each
+// side and remaining parallel overlaps are nudged apart.
+
+const r2 = v => Math.round(v * 100) / 100;
+const lowerBound = (a, v) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < v) lo = m + 1; else hi = m; } return lo; };
+
+class Heap {
+  constructor() { this.k = []; this.v = []; }
+  get size() { return this.k.length; }
+  push(key, val) {
+    const k = this.k, v = this.v; let i = k.length; k.push(key); v.push(val);
+    while (i > 0) { const p = (i - 1) >> 1; if (k[p] <= key) break; k[i] = k[p]; v[i] = v[p]; i = p; }
+    k[i] = key; v[i] = val;
+  }
+  pop() {
+    const k = this.k, v = this.v, top = [k[0], v[0]], lk = k.pop(), lv = v.pop(), n = k.length;
+    if (n) { let i = 0; for (;;) { let c = 2 * i + 1; if (c >= n) break; if (c + 1 < n && k[c + 1] < k[c]) c++; if (k[c] >= lk) break; k[i] = k[c]; v[i] = v[c]; i = c; } k[i] = lk; v[i] = lv; }
+    return top;
+  }
+}
+
+const sidesOf = (n, m) => {
+  const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+  return [
+    { s: 'R', a: { x: n.x + n.w, y: cy }, c: { x: n.x + n.w + m, y: cy }, axis: 0 },
+    { s: 'L', a: { x: n.x, y: cy }, c: { x: n.x - m, y: cy }, axis: 0 },
+    { s: 'T', a: { x: cx, y: n.y }, c: { x: cx, y: n.y - m }, axis: 1 },
+    { s: 'B', a: { x: cx, y: n.y + n.h }, c: { x: cx, y: n.y + n.h + m }, axis: 1 },
+  ];
+};
+
+const compress = pts => {
+  const out = [];
+  for (const p of pts) {
+    if (out.length && Math.abs(out[out.length - 1].x - p.x) < 0.01 && Math.abs(out[out.length - 1].y - p.y) < 0.01) continue;
+    out.push({ x: p.x, y: p.y });
+    while (out.length >= 3) {
+      const a = out[out.length - 3], b = out[out.length - 2], c = out[out.length - 1];
+      if ((Math.abs(a.x - b.x) < 0.01 && Math.abs(b.x - c.x) < 0.01) || (Math.abs(a.y - b.y) < 0.01 && Math.abs(b.y - c.y) < 0.01)) out.splice(out.length - 2, 1); else break;
+    }
+  }
+  return out;
+};
+
+function rerouteAll(model, { margin = 14, bendCost = 50, overlapCost = 8, overlapRate = 0.2, crossCost = 10, step = 5 } = {}) {
+  // free-floating text notes are not obstacles (they would also create routing corridors outside the diagram)
+  const obst = [...model.nodes.values()].filter(n => !n.isGroup && !n.ctxBox && !n.isContainer && !n.style.text);
+  const byId = new Map(obst.map(n => [n.id, n]));
+  const todo = model.edges.filter(e => e.source && e.target && e.source !== e.target && byId.has(e.source) && byId.has(e.target));
+  const stats = { routed: 0, fallback: 0, skipped: model.edges.length - todo.length };
+  if (!todo.length) return stats;
+
+  const xset = new Set(), yset = new Set();
+  for (const n of obst) {
+    xset.add(r2(n.x - margin)); xset.add(r2(n.x + n.w + margin)); xset.add(r2(n.x + n.w / 2));
+    yset.add(r2(n.y - margin)); yset.add(r2(n.y + n.h + margin)); yset.add(r2(n.y + n.h / 2));
+  }
+  const xs = [...xset].sort((a, b) => a - b), ys = [...yset].sort((a, b) => a - b);
+  const xi = new Map(xs.map((v, i) => [v, i])), yi = new Map(ys.map((v, i) => [v, i]));
+  const NYg = ys.length;
+  const segUse = new Map(), ptMask = new Map();
+  const centre = n => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
+  const order = [...todo].sort((a, b) => {
+    const d = e => { const p = centre(byId.get(e.source)), q = centre(byId.get(e.target)); return Math.abs(p.x - q.x) + Math.abs(p.y - q.y); };
+    return d(a) - d(b);
+  });
+
+  const routes = [];
+  for (const e of order) {
+    const sn = byId.get(e.source), tn = byId.get(e.target);
+    const S = sidesOf(sn, margin), T = sidesOf(tn, margin);
+    let found = null;
+    let W = 220;
+    for (let attempt = 0; attempt < 4 && !found; attempt++, W *= 3) {
+      const bx0 = Math.min(sn.x, tn.x) - W, bx1 = Math.max(sn.x + sn.w, tn.x + tn.w) + W, by0 = Math.min(sn.y, tn.y) - W, by1 = Math.max(sn.y + sn.h, tn.y + tn.h) + W;
+      const full = attempt === 3;
+      const i0 = full ? 0 : lowerBound(xs, bx0), i1 = full ? xs.length - 1 : Math.min(xs.length - 1, lowerBound(xs, bx1 + 1e-6) - 1);
+      const j0 = full ? 0 : lowerBound(ys, by0), j1 = full ? ys.length - 1 : Math.min(ys.length - 1, lowerBound(ys, by1 + 1e-6) - 1);
+      const NX = i1 - i0 + 1, NY = j1 - j0 + 1;
+      if (NX < 2 || NY < 2) continue;
+      const blocked = new Uint8Array(NX * NY);
+      for (const o of obst) {
+        const l = o.x - margin + 1e-3, r = o.x + o.w + margin - 1e-3, t = o.y - margin + 1e-3, b = o.y + o.h + margin - 1e-3;
+        if (r < xs[i0] || l > xs[i1] || b < ys[j0] || t > ys[j1]) continue;
+        const a0 = Math.max(i0, lowerBound(xs, l)), a1 = Math.min(i1, lowerBound(xs, r + 1e-9) - 1);
+        const c0 = Math.max(j0, lowerBound(ys, t)), c1 = Math.min(j1, lowerBound(ys, b + 1e-9) - 1);
+        for (let i = a0; i <= a1; i++) for (let j = c0; j <= c1; j++) blocked[(i - i0) * NY + (j - j0)] = 1;
+      }
+      const loc = c => { const gi = xi.get(r2(c.x)), gj = yi.get(r2(c.y)); return gi === undefined || gj === undefined || gi < i0 || gi > i1 || gj < j0 || gj > j1 ? -1 : (gi - i0) * NY + (gj - j0); };
+      const targets = new Map();
+      for (const t of T) { const p = loc(t.c); if (p >= 0 && !blocked[p]) targets.set(p, t); }
+      const starts = [];
+      for (const s of S) { const p = loc(s.c); if (p >= 0 && !blocked[p]) starts.push({ p, s }); }
+      if (!targets.size || !starts.length) continue;
+      const tl = [...targets.keys()].map(p => [xs[i0 + Math.floor(p / NY)], ys[j0 + (p % NY)]]);
+      const hfn = p => { const x = xs[i0 + Math.floor(p / NY)], y = ys[j0 + (p % NY)]; let m = Infinity; for (const [tx, ty] of tl) m = Math.min(m, Math.abs(x - tx) + Math.abs(y - ty)); return m; };
+      const dist = new Float64Array(NX * NY * 3).fill(Infinity), prev = new Int32Array(NX * NY * 3).fill(-1);
+      const heap = new Heap();
+      const startSide = new Map();
+      for (const { p, s } of starts) { const st = p * 3 + s.axis; dist[st] = 0; startSide.set(st, s); heap.push(hfn(p), st); }
+      let best = null;
+      while (heap.size) {
+        const [f, st] = heap.pop();
+        if (best && f >= best.total) break;
+        const p = Math.floor(st / 3), d = st % 3, g = dist[st];
+        if (g + hfn(p) > f + 1e-6) continue;
+        const tgt = targets.get(p);
+        if (tgt) { const total = g + (d !== tgt.axis ? bendCost : 0); if (!best || total < best.total) best = { total, st, tgt }; }
+        const pi = Math.floor(p / NY), pj = p % NY, gi = i0 + pi, gj = j0 + pj;
+        for (let dir = 0; dir < 4; dir++) {
+          const di = dir === 0 ? 1 : dir === 1 ? -1 : 0, dj = dir === 2 ? 1 : dir === 3 ? -1 : 0;
+          const ni = pi + di, nj = pj + dj;
+          if (ni < 0 || nj < 0 || ni >= NX || nj >= NY) continue;
+          const np = ni * NY + nj;
+          if (blocked[np]) continue;
+          const nd = di ? 0 : 1;
+          const len = di ? Math.abs(xs[i0 + ni] - xs[gi]) : Math.abs(ys[j0 + nj] - ys[gj]);
+          const kg = Math.min(gi, i0 + ni) * NYg + Math.min(gj, j0 + nj);
+          let c = len + (d !== nd ? bendCost : 0);
+          if (segUse.has(kg * 2 + nd)) c += overlapCost + overlapRate * len;
+          const mk = ptMask.get((i0 + ni) * NYg + (j0 + nj)) || 0;
+          if (mk & (nd === 0 ? 2 : 1)) c += crossCost;
+          const ns = np * 3 + nd, ng = g + c;
+          if (ng < dist[ns]) { dist[ns] = ng; prev[ns] = st; heap.push(ng + hfn(np), ns); }
+        }
+      }
+      if (best) {
+        const chain = []; let st = best.st;
+        for (; st >= 0; st = prev[st]) chain.push(st);
+        chain.reverse();
+        const pts = chain.map(s => { const p = Math.floor(s / 3); return { x: xs[i0 + Math.floor(p / NY)], y: ys[j0 + (p % NY)] }; });
+        // mark usage for later connectors
+        for (let k = 0; k < chain.length; k++) {
+          const p = Math.floor(chain[k] / 3), gi = i0 + Math.floor(p / NY), gj = j0 + (p % NY);
+          if (k > 0) {
+            const q = Math.floor(chain[k - 1] / 3), hi = i0 + Math.floor(q / NY), hj = j0 + (q % NY);
+            const ax = gi !== hi ? 0 : 1;
+            segUse.set((Math.min(gi, hi) * NYg + Math.min(gj, hj)) * 2 + ax, 1);
+            ptMask.set(gi * NYg + gj, (ptMask.get(gi * NYg + gj) || 0) | (1 << ax));
+            ptMask.set(hi * NYg + hj, (ptMask.get(hi * NYg + hj) || 0) | (1 << ax));
+          }
+        }
+        found = compress([startSide.get(chain[0]).a, ...pts, best.tgt.a]);
+      }
+    }
+    if (!found) {
+      const [sa, sb] = defaultSides(sn, tn);
+      found = compress(orthoPath(sideMid(sn, sa), sa, sideMid(tn, sb), sb));
+      stats.fallback++;
+    } else stats.routed++;
+    routes.push({ e, sn, tn, pts: found });
+  }
+
+  spreadPorts(routes);
+  nudgeParallels(routes, margin, step);
+  for (const { e, pts } of routes) { e.route = pts; e.points = pts.slice(1, -1); }
+  return stats;
+}
+
+function sideOfPoint(n, p) {
+  if (Math.abs(p.x - n.x) < 0.5) return 'L';
+  if (Math.abs(p.x - (n.x + n.w)) < 0.5) return 'R';
+  if (Math.abs(p.y - n.y) < 0.5) return 'T';
+  return 'B';
+}
+
+// several connectors on the same side of a shape: fan them out instead of stacking on the midpoint
+function spreadPorts(routes) {
+  const groups = new Map();
+  for (const r of routes) {
+    if (r.pts.length < 3) continue;
+    for (const end of [0, 1]) {
+      const n = end ? r.tn : r.sn, p = end ? r.pts[r.pts.length - 1] : r.pts[0];
+      const key = n.id + '|' + sideOfPoint(n, p);
+      if (!groups.has(key)) groups.set(key, { n, side: sideOfPoint(n, p), items: [] });
+      groups.get(key).items.push({ r, end });
+    }
+  }
+  for (const g of groups.values()) {
+    if (g.items.length < 2) continue;
+    const horiz = g.side === 'L' || g.side === 'R';             // side runs vertically -> spread along y
+    const ax = horiz ? 'y' : 'x';
+    const pull = ({ r, end }) => {
+      const pts = end ? [...r.pts].reverse() : r.pts, a = pts[0][ax];
+      for (const p of pts) if (Math.abs(p[ax] - a) > 0.5) return p[ax];
+      return pts[pts.length - 1][ax];
+    };
+    const items = g.items.map(it => ({ ...it, key: pull(it) })).sort((p, q) => p.key - q.key);
+    const lo = horiz ? g.n.y : g.n.x, len = horiz ? g.n.h : g.n.w;
+    items.forEach(({ r, end }, i) => {
+      const pos = lo + (len * (i + 1)) / (items.length + 1);
+      const k = end ? r.pts.length - 1 : 0, nb = end ? k - 1 : 1;
+      if (Math.abs(r.pts[nb][ax] - r.pts[k][ax]) > 0.5) return;  // first segment is not perpendicular to the side; leave it
+      r.pts[k][ax] = pos; r.pts[nb][ax] = pos;
+    });
+  }
+}
+
+// collinear overlapping runs from different connectors are pushed apart inside the clearance channel
+function nudgeParallels(routes, margin, step) {
+  const segs = [];
+  routes.forEach((r, ri) => {
+    for (let i = 1; i + 1 <= r.pts.length - 2; i++) {
+      const a = r.pts[i], b = r.pts[i + 1];
+      if (Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) > 0.01) segs.push({ r, ri, i, v: true, c: a.x, lo: Math.min(a.y, b.y), hi: Math.max(a.y, b.y) });
+      else if (Math.abs(a.y - b.y) < 0.01 && Math.abs(a.x - b.x) > 0.01) segs.push({ r, ri, i, v: false, c: a.y, lo: Math.min(a.x, b.x), hi: Math.max(a.x, b.x) });
+    }
+  });
+  const buckets = new Map();
+  for (const s of segs) { const k = (s.v ? 'v' : 'h') + Math.round(s.c * 2); (buckets.get(k) || buckets.set(k, []).get(k)).push(s); }
+  const maxOff = margin - 3;
+  for (const list of buckets.values()) {
+    if (list.length < 2) continue;
+    list.sort((p, q) => p.lo - q.lo || p.ri - q.ri);
+    let cluster = [], hi = -Infinity;
+    const flush = () => {
+      const k = cluster.length;
+      if (k > 1) {
+        const st = Math.min(step, (2 * maxOff) / (k - 1));
+        cluster.forEach((s, j) => {
+          const off = (j - (k - 1) / 2) * st, a = s.r.pts[s.i], b = s.r.pts[s.i + 1];
+          if (s.v) { a.x += off; b.x += off; } else { a.y += off; b.y += off; }
+        });
+      }
+      cluster = []; hi = -Infinity;
+    };
+    for (const s of list) {
+      if (cluster.length && s.lo >= hi - 2) flush();
+      cluster.push(s); hi = Math.max(hi, s.hi);
+    }
+    flush();
+  }
+}
+
+/** Quality measures for the connectors as currently routed (used by tests and diagnostics). */
+function routeMetrics(model) {
+  const leaves = [...model.nodes.values()].filter(n => !n.isGroup && !n.ctxBox && !n.isContainer && !n.style.text);
+  const through = [];
+  let bends = 0, length = 0, overlaps = 0;
+  const segs = [];
+  model.edges.forEach((e, ei) => {
+    const pts = routeEdge(e, model.nodes);
+    if (pts.length < 2) return;
+    bends += Math.max(0, pts.length - 2);
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      length += Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+      segs.push({ ei, a, b });
+      const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+      for (const n of leaves) {
+        if (n.id === e.source || n.id === e.target) continue;
+        if (x1 > n.x + 1 && x0 < n.x + n.w - 1 && y1 > n.y + 1 && y0 < n.y + n.h - 1) { through.push({ edge: e.id, node: n.id }); break; }
+      }
+    }
+  });
+  for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
+    const p = segs[i], q = segs[j];
+    if (p.ei === q.ei) continue;
+    const pv = Math.abs(p.a.x - p.b.x) < 0.5, qv = Math.abs(q.a.x - q.b.x) < 0.5, ph = Math.abs(p.a.y - p.b.y) < 0.5, qh = Math.abs(q.a.y - q.b.y) < 0.5;
+    if (pv && qv && Math.abs(p.a.x - q.a.x) < 0.5) { const o = Math.min(Math.max(p.a.y, p.b.y), Math.max(q.a.y, q.b.y)) - Math.max(Math.min(p.a.y, p.b.y), Math.min(q.a.y, q.b.y)); if (o > 2) overlaps++; }
+    else if (ph && qh && Math.abs(p.a.y - q.a.y) < 0.5) { const o = Math.min(Math.max(p.a.x, p.b.x), Math.max(q.a.x, q.b.x)) - Math.max(Math.min(p.a.x, p.b.x), Math.min(q.a.x, q.b.x)); if (o > 2) overlaps++; }
+  }
+  return { bends, length: Math.round(length), through, overlaps };
 }
 
 
@@ -7347,6 +7869,11 @@ async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, focus = 
   const lanes = findLanes(sub);
   if (lanes) return tidyLanes(sub, lanes, ELK, { spacing, focus });
   const nodes = new Map([...sub.nodes].map(([k, v]) => [k, { ...v }]));
+  // zones become temporary compound nodes so ELK keeps their members together; frames are laid out from the result
+  if (sub.zones && sub.zones.length) {
+    for (const z of sub.zones) nodes.set('zone:' + z.id, { id: 'zone:' + z.id, synthetic: true, isGroup: true, isContainer: true, parent: z.parent ? 'zone:' + z.parent : null, x: 0, y: 0, w: 0, h: 0, style: {}, meta: {}, text: '', order: -1 });
+    for (const n of nodes.values()) if (!n.synthetic && !n.parent && sub.zoneOf && sub.zoneOf.has(n.id)) n.parent = 'zone:' + sub.zoneOf.get(n.id);
+  }
   const childrenOf = new Map();
   for (const n of nodes.values()) {
     const p = n.parent && nodes.has(n.parent) ? n.parent : null;
@@ -7400,7 +7927,10 @@ async function tidyModel(sub, ELK, { direction = 'RIGHT', spacing = 50, focus = 
     }
     outEdges.push(e);
   }
-  return { nodes, edges: outEdges, groups: sub.groups, diagnostics: sub.diagnostics, focus };
+  for (const [id, n] of [...nodes]) { if (n.synthetic) nodes.delete(id); else n.parent = sub.nodes.get(id).parent; }
+  const out = { nodes, edges: outEdges, groups: sub.groups, diagnostics: sub.diagnostics, focus, zones: sub.zones, zoneOf: sub.zoneOf, frameMeta: sub.frameMeta, layers: sub.layers };
+  layoutZones(out, { frameMeta: sub.frameMeta !== false });
+  return out;
 }
 
 // ---------- swimlane-aware tidy ----------
@@ -7424,7 +7954,7 @@ async function tidyLanes(sub, { blocks, axis }, ELK, { spacing, focus }) {
   const m = {
     nodes: new Map([...sub.nodes].map(([k, v]) => [k, { ...v }])),
     edges: sub.edges.filter(e => e.source && e.target).map(e => ({ ...e, route: null, points: [] })),
-    groups: sub.groups, diagnostics: sub.diagnostics, focus,
+    groups: sub.groups, diagnostics: sub.diagnostics, focus, zones: sub.zones, zoneOf: sub.zoneOf, frameMeta: sub.frameMeta, layers: sub.layers,
   };
   const keep = new Set();
   blocks.forEach(b => { if (b.pool) keep.add(b.pool.id); b.lanes.forEach(l => keep.add(l.id)); });
@@ -7507,6 +8037,7 @@ async function tidyLanes(sub, { blocks, axis }, ELK, { spacing, focus }) {
 
   routeLaneEdges(m, leaves, layerOf, layerX, lw, gapX);
   if (axis === 'col') transposeModel(m);
+  layoutZones(m, { frameMeta: sub.frameMeta !== false });
   return m;
 }
 
@@ -7563,45 +8094,299 @@ function routeLaneEdges(m, leaves, layerOf, layerX, lw, gapX) {
 
 
 
-const xa = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#xa;');
 
-/** Serialise a (sub-)model as an uncompressed draw.io file that opens and edits normally. */
-function toDrawio(model, { name = 'Service view' } = {}) {
+// Checks on the main diagram. Pure: takes the (layer-filtered) model and returns findings the UI can list,
+// highlight and export. severity: error | warn | info.
+
+const label = n => (n.text || '').split('\n')[0].trim() || `(${n.id})`;
+
+function diagnose(model, { metaKey = null, zones = null, routes = true } = {}) {
+  const graph = buildGraph(model);
+  const services = [...model.nodes.values()].filter(n => !n.isGroup && !n.ctxBox && !n.style.text);
+  const svc = new Map(services.map(n => [n.id, n]));
+  const nm = id => (model.nodes.has(id) ? label(model.nodes.get(id)) : id);
+  const elabel = e => `${e.label ? `“${e.label.split('\n')[0]}” ` : ''}${e.source ? nm(e.source) : '∅'} → ${e.target ? nm(e.target) : '∅'}`;
+  const findings = [];
+  const add = (id, severity, title, help, items) => { if (items.length) findings.push({ id, severity, title, help, items }); };
+  const nodeItem = n => ({ label: label(n), nodes: [n.id], edges: [] });
+  const edgeItem = (e, note) => ({ label: elabel(e), nodes: [e.source, e.target].filter(Boolean), edges: [e.id], note });
+
+  // ---- connector attachment
+  const free = model.edges.filter(e => !e.source && !e.target);
+  add('free-edges', 'error', 'Connectors attached at neither end', 'These lines are not connected to any shape, so they carry no lineage. Glue both ends to shapes in draw.io.',
+    free.map(e => ({ ...edgeItem(e), point: e.srcPoint || e.tgtPoint || e.points[0] || null })));
+  const dangling = model.edges.filter(e => !!e.source !== !!e.target);
+  add('dangling', 'error', 'Connectors attached at only one end', 'Lineage stops at the loose end. Connect it to the missing shape.', dangling.map(e => edgeItem(e, e.source ? 'no target' : 'no source')));
+  add('inferred', 'warn', 'Connectors attached by proximity only', 'The line ends near a shape but is not glued to it; the viewer assumed the nearest shape. Re-attach them in draw.io so other tools agree.',
+    model.edges.filter(e => e.inferred && e.source && e.target).map(e => edgeItem(e)));
+  add('self-loops', 'warn', 'Connectors that start and end on the same shape', 'Usually an accidental drag; ignored by lineage.', model.edges.filter(e => e.source && e.source === e.target).map(e => edgeItem(e)));
+  const toContainer = model.edges.filter(e => [e.source, e.target].some(id => id && model.nodes.get(id) && model.nodes.get(id).isContainer));
+  add('container-edges', 'warn', 'Connectors attached to a container, not a service', 'The line ends on a box that also holds other shapes. Attach it to the service inside, or the container is treated as one service.', toContainer.map(e => edgeItem(e)));
+
+  // ---- connector semantics
+  const real = model.edges.filter(e => e.source && e.target && e.source !== e.target && svc.has(e.source) && svc.has(e.target));
+  const dup = new Map();
+  for (const e of real) { const k = e.source + '>' + e.target; (dup.get(k) || dup.set(k, []).get(k)).push(e); }
+  add('duplicate-edges', 'warn', 'Repeated connectors between the same two shapes', 'Merge them (and combine their labels) or confirm they are different flows.',
+    [...dup.values()].filter(g => g.length > 1).map(g => ({ label: `${nm(g[0].source)} → ${nm(g[0].target)} ×${g.length}`, nodes: [g[0].source, g[0].target], edges: g.map(e => e.id), note: g.map(e => e.label || '(no label)').join(' | ') })));
+  const recip = [];
+  for (const [k, g] of dup) { const [s, t] = k.split('>'); if (s < t && dup.has(t + '>' + s)) recip.push({ label: `${nm(s)} ⇄ ${nm(t)}`, nodes: [s, t], edges: [...g, ...dup.get(t + '>' + s)].map(e => e.id) }); }
+  add('reciprocal', 'info', 'Two-way flows drawn as two connectors', 'Fine for request/response, but check both directions are intended.', recip);
+  add('undirected', 'warn', 'Connectors with no arrowheads', 'Direction is unknown, so lineage treats them as two-way and upstream/downstream results are inflated.', real.filter(e => e.undirected).map(e => edgeItem(e)));
+  add('unlabelled-edges', 'info', 'Connectors with no label', 'Label what flows (data type, protocol) so exported views are self-explanatory.', real.filter(e => !e.label).map(e => edgeItem(e)));
+
+  // ---- shapes
+  add('unlabelled-shapes', 'warn', 'Shapes with no label', 'Exported views will show blank boxes.', services.filter(n => !n.text.trim()).map(n => ({ label: `(${n.id})`, nodes: [n.id], edges: [] })));
+  const connected = new Set(); for (const e of real) { connected.add(e.source); connected.add(e.target); }
+  add('unconnected', 'warn', 'Shapes with no connectors', 'Not part of any lineage. Connect, or remove if obsolete.', services.filter(n => !connected.has(n.id) && !n.isContainer && n.text.trim()).map(nodeItem));
+  const byLabel = new Map();
+  for (const n of services) { const t = n.text.trim(); if (t) (byLabel.get(t) || byLabel.set(t, []).get(t)).push(n.id); }
+  add('duplicate-labels', 'warn', 'Shapes sharing a label', 'They are separate in lineage but indistinguishable in lists and exports. Rename, or confirm they are different things.',
+    [...byLabel].filter(([, ids]) => ids.length > 1).map(([t, ids]) => ({ label: `${t.split('\n')[0]} ×${ids.length}`, nodes: ids, edges: [] })));
+
+  // overlapping shapes
+  const ov = [];
+  for (let i = 0; i < services.length; i++) for (let j = i + 1; j < services.length; j++) {
+    const a = services[i], b = services[j];
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    if (w > 2 && h > 2 && w * h > 0.1 * Math.min(a.w * a.h, b.w * b.h) && !(a.isContainer || b.isContainer)) ov.push({ label: `${label(a)} / ${label(b)}`, nodes: [a.id, b.id], edges: [] });
+  }
+  add('overlapping-shapes', 'warn', 'Overlapping shapes', 'One shape may be hiding another (or a duplicate was pasted on top).', ov);
+
+  // ---- connectivity
+  const nbr = new Map(services.map(n => [n.id, new Set()]));
+  for (const e of real) { nbr.get(e.source).add(e.target); nbr.get(e.target).add(e.source); }
+  const comps = [], seen = new Set();
+  for (const n of services) {
+    if (seen.has(n.id) || !nbr.get(n.id).size) continue;
+    const comp = []; const q = [n.id]; seen.add(n.id);
+    while (q.length) { const id = q.pop(); comp.push(id); for (const m of nbr.get(id)) if (!seen.has(m)) { seen.add(m); q.push(m); } }
+    comps.push(comp);
+  }
+  comps.sort((a, b) => b.length - a.length);
+  add('islands', 'warn', `Disconnected groups (${comps.length} in total)`, 'The diagram is split into separate islands; lineage cannot cross between them. The largest is treated as the main diagram.',
+    comps.slice(1).map(c => ({ label: `${c.length} shapes: ${c.slice(0, 4).map(nm).join(', ')}${c.length > 4 ? '…' : ''}`, nodes: c, edges: [] })));
+
+  const hasIn = n => graph.inn.get(n.id).length > 0, hasOut = n => graph.out.get(n.id).length > 0;
+  add('sources', 'info', 'Origins: shapes with outputs but no inputs', 'Expected for real data sources; anything else may be missing an inbound connector.', services.filter(n => hasOut(n) && !hasIn(n)).map(nodeItem));
+  add('sinks', 'info', 'Dead ends: shapes with inputs but no outputs', 'Expected for stores and reports; processing services that end here may be missing an outbound connector.', services.filter(n => hasIn(n) && !hasOut(n)).map(nodeItem));
+
+  // hubs
+  const deg = services.map(n => ({ n, d: nbr.get(n.id).size })).sort((a, b) => b.d - a.d);
+  const med = deg.length ? deg[Math.floor(deg.length / 2)].d : 0, thr = Math.max(6, med * 2.5);
+  add('hubs', 'info', 'Highly connected shapes (hubs)', 'Lineage through these shapes fans out widely. Right-click a hub to stop traces passing through it.',
+    deg.filter(x => x.d >= thr).slice(0, 10).map(x => ({ label: `${label(x.n)} (${x.d} neighbours)`, nodes: [x.n.id], edges: [] })));
+
+  // articulation points (single points of connectivity)
+  const ap = articulationPoints(nbr);
+  const partsAfter = id => {
+    const sn = new Set([id]); let parts = 0; const sizes = [];
+    for (const s of nbr.get(id)) { if (sn.has(s)) continue; let c = 0; const q = [s]; sn.add(s); while (q.length) { const x = q.pop(); c++; for (const m of nbr.get(x)) if (!sn.has(m)) { sn.add(m); q.push(m); } } parts++; sizes.push(c); }
+    return sizes.sort((a, b) => b - a);
+  };
+  add('cut-points', 'info', 'Single points of connectivity', 'Removing one of these shapes disconnects part of the diagram: candidates for resilience or ownership review.',
+    ap.map(id => ({ id, sizes: partsAfter(id) })).filter(x => x.sizes.length > 1).sort((a, b) => b.sizes.length - a.sizes.length || b.sizes[1] - a.sizes[1]).slice(0, 15)
+      .map(x => ({ label: `${nm(x.id)} → splits into ${x.sizes.length} parts (${x.sizes.slice(0, 4).join(' / ')}${x.sizes.length > 4 ? '…' : ''})`, nodes: [x.id], edges: [] })));
+
+  // lanes
+  const lanes = findLanes(model);
+  if (lanes) {
+    const inLane = new Set();
+    for (const b of lanes.blocks) for (const l of b.lanes) for (const n of services) { let p = n.parent; while (p) { if (p === l.id) { inLane.add(n.id); break; } p = model.nodes.get(p) && model.nodes.get(p).parent; } }
+    add('outside-lanes', 'warn', 'Shapes outside every swimlane', 'In a swimlane diagram each service should sit in a lane.', services.filter(n => !inLane.has(n.id) && !n.isContainer).map(nodeItem));
+  }
+
+  // zones from context layers
+  if (zones && zones.zones.size) {
+    add('outside-zones', 'warn', 'Shapes not inside any zone box', 'No box on a context layer contains these shapes, so sub-views will not show their zone.', services.filter(n => !zones.zoneOf.has(n.id) && !n.isContainer).map(nodeItem));
+    add('empty-zones', 'info', 'Zone boxes containing no shapes', 'Unused or misplaced boxes on a context layer.', [...zones.zones.values()].filter(z => !z.members.size).map(z => ({ label: label(z.node), nodes: [z.node.id], edges: [] })));
+  }
+
+  // metadata completeness
+  const keys = new Map();
+  for (const n of services) for (const k of Object.keys(n.meta || {})) keys.set(k, (keys.get(k) || 0) + 1);
+  const metaKeys = [...keys].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ key: k, count: c }));
+  if (metaKey) add('missing-property', 'warn', `Shapes missing “${metaKey}”`, 'Fill in the draw.io property (Edit Data) so reports and filters are complete.', services.filter(n => !(n.meta && String(n.meta[metaKey] || '').trim())).map(nodeItem));
+
+  // layers
+  const info = [];
+  for (const l of model.layers || []) if (!l.nodes && !l.edges) info.push({ label: `Layer “${l.name}” is empty`, nodes: [], edges: [] });
+  add('empty-layers', 'info', 'Empty layers', 'Candidates for clean-up.', info);
+
+  // routing quality
+  if (routes) {
+    const m = routeMetrics(model);
+    add('through-shapes', 'warn', 'Connectors drawn through other shapes', 'The line crosses a shape that is not one of its ends, which makes it look connected to it. Use Tidy to reroute connectors.',
+      m.through.map(t => { const e = model.edges.find(x => x.id === t.edge); return { label: `${elabel(e)} passes through ${nm(t.node)}`, nodes: [t.node], edges: [t.edge] }; }));
+    if (m.overlaps > 0) findings.push({ id: 'overlapping-lines', severity: 'info', title: 'Connectors running on top of each other', help: `${m.overlaps} places where lines overlap and look like one. Tidy spreads them apart.`, items: [] });
+  }
+
+  const order = { error: 0, warn: 1, info: 2 };
+  findings.sort((a, b) => order[a.severity] - order[b.severity]);
+  const counts = { error: 0, warn: 0, info: 0 };
+  for (const f of findings) counts[f.severity] += f.items.length || 1;
+  return { findings, counts, metaKeys, summary: { shapes: services.length, connectors: model.edges.length, islands: comps.length, layers: (model.layers || []).length } };
+}
+
+// iterative Tarjan on an undirected adjacency map
+function articulationPoints(nbr) {
+  const disc = new Map(), low = new Map(), out = new Set();
+  let t = 0;
+  for (const root of nbr.keys()) {
+    if (disc.has(root)) continue;
+    let rootKids = 0;
+    const stack = [{ id: root, parent: null, it: [...nbr.get(root)][Symbol.iterator]() }];
+    disc.set(root, ++t); low.set(root, t);
+    while (stack.length) {
+      const f = stack[stack.length - 1], nx = f.it.next();
+      if (nx.done) {
+        stack.pop();
+        if (stack.length) {
+          const p = stack[stack.length - 1];
+          low.set(p.id, Math.min(low.get(p.id), low.get(f.id)));
+          if (p.id !== root && low.get(f.id) >= disc.get(p.id)) out.add(p.id);
+        }
+        continue;
+      }
+      const m = nx.value;
+      if (m === f.parent) continue;
+      if (disc.has(m)) low.set(f.id, Math.min(low.get(f.id), disc.get(m)));
+      else { disc.set(m, ++t); low.set(m, t); if (f.id === root) rootKids++; stack.push({ id: m, parent: f.id, it: [...nbr.get(m)][Symbol.iterator]() }); }
+    }
+    if (rootKids > 1) out.add(root);
+  }
+  return [...out];
+}
+
+const sevMark = { error: 'ERROR', warn: 'WARN', info: 'INFO' };
+
+function findingsToMarkdown(result, { file = '', page = '' } = {}) {
+  const L = [`# Diagram checks${file ? ` — ${file}` : ''}${page ? ` (${page})` : ''}`, '',
+    `${result.summary.shapes} shapes · ${result.summary.connectors} connectors · ${result.summary.layers} layers`, '',
+    `Errors: ${result.counts.error} · Warnings: ${result.counts.warn} · Notes: ${result.counts.info}`, ''];
+  for (const f of result.findings) {
+    L.push(`## [${sevMark[f.severity]}] ${f.title}`, '', f.help, '');
+    for (const it of f.items.slice(0, 200)) L.push(`- ${it.label}${it.note ? ` — ${it.note}` : ''}`);
+    if (f.items.length > 200) L.push(`- … ${f.items.length - 200} more`);
+    L.push('');
+  }
+  return L.join('\n');
+}
+
+function findingsToCsv(result) {
+  const q = s => `"${String(s).replace(/"/g, '""')}"`;
+  const rows = [['severity', 'check', 'item', 'note', 'shape_ids', 'connector_ids'].join(',')];
+  for (const f of result.findings) for (const it of (f.items.length ? f.items : [{ label: f.help, nodes: [], edges: [] }]))
+    rows.push([f.severity, q(f.title), q(it.label), q(it.note || ''), q(it.nodes.join(' ')), q(it.edges.join(' '))].join(','));
+  return rows.join('\n');
+}
+
+
+
+const xa = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#xa;');
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const fr = v => +clamp01(v).toFixed(3);
+
+// style string helpers
+const dropKeys = (style, re) => style.split(';').filter(p => p && !re.test(p.split('=')[0])).join(';');
+
+// exit/entry points that match a routed polyline, so draw.io re-opens the connector as it was tidied
+function edgeStyleFor(e, nodes) {
+  if (!e.route || e.route.length < 2) return e.styleStr;
+  let st = dropKeys(e.styleStr, /^(exit|entry)(X|Y|Dx|Dy|Perimeter)$|^edgeStyle$|^curved$/);
+  st += `;edgeStyle=orthogonalEdgeStyle;curved=0`;
+  const sn = nodes.get(e.source), tn = nodes.get(e.target);
+  if (sn) { const p = e.route[0]; st += `;exitX=${fr((p.x - sn.x) / sn.w)};exitY=${fr((p.y - sn.y) / sn.h)};exitDx=0;exitDy=0`; }
+  if (tn) { const p = e.route[e.route.length - 1]; st += `;entryX=${fr((p.x - tn.x) / tn.w)};entryY=${fr((p.y - tn.y) / tn.h)};entryDx=0;entryDy=0`; }
+  return st;
+}
+
+/**
+ * Serialise a (sub-)model as an uncompressed draw.io file that opens and edits normally.
+ * heading: {title, subtitle} is written as text cells above the diagram; zone frames become dashed container-style boxes.
+ */
+function toDrawio(model, { name = 'Service view', heading = null, margin = 20, focusId = null } = {}) {
   const cells = [];
-  const sorted = depthSorted(model);
-  for (const n of sorted) {
+  const all = depthSorted(model);
+  const li = new Map((model.layers || []).map((l, i) => [l.id, i]));
+  const lay = n => (li.has(n.layer) ? li.get(n.layer) : 0);
+  const back = all.filter(n => n.isGroup || n.ctxBox).sort((p, q) => lay(p) - lay(q) || (p.ctxBox && q.ctxBox ? q.w * q.h - p.w * p.h : 0));
+  const front = all.filter(n => !n.isGroup && !n.ctxBox);
+  const hasLanes = back.some(n => n.isGroup);
+
+  const vertex = n => {
     const p = n.parent && model.nodes.get(n.parent);
     const gx = n.x - (p ? p.x : 0), gy = n.y - (p ? p.y : 0);
-    const cell = `<mxCell${Object.keys(n.meta || {}).length ? '' : ` id="${xa(n.id)}" value="${xa(n.raw)}"`} style="${xa(n.styleStr)}" vertex="1" parent="${p ? xa(p.id) : '1'}"><mxGeometry x="${Math.round(gx)}" y="${Math.round(gy)}" width="${Math.round(n.w)}" height="${Math.round(n.h)}" as="geometry"/></mxCell>`;
-    if (Object.keys(n.meta || {}).length) {
-      const attrs = Object.entries(n.meta).map(([k, v]) => ` ${xa(k)}="${xa(v)}"`).join('');
-      cells.push(`<object label="${xa(n.raw)}" id="${xa(n.id)}"${attrs}>${cell}</object>`);
-    } else cells.push(cell);
-  }
+    let style = n.styleStr;
+    if (n.id === focusId) style = dropKeys(style, /^strokeWidth$/) + ';strokeWidth=3';
+    const meta = Object.keys(n.meta || {}).length;
+    const cell = `<mxCell${meta ? '' : ` id="${xa(n.id)}" value="${xa(n.raw)}"`} style="${xa(style)}" vertex="1" parent="${p ? xa(p.id) : '1'}"><mxGeometry x="${Math.round(gx)}" y="${Math.round(gy)}" width="${Math.round(n.w)}" height="${Math.round(n.h)}" as="geometry"/></mxCell>`;
+    if (!meta) return cell;
+    const attrs = Object.entries(n.meta).map(([k, v]) => ` ${xa(k)}="${xa(v)}"`).join('');
+    return `<object label="${xa(n.raw)}" id="${xa(n.id)}"${attrs}>${cell}</object>`;
+  };
+  const frameCell = f => {
+    const s = f.style || {};
+    const fill = s.fillColor && s.fillColor !== 'default' ? s.fillColor : '#f3f4f6', stroke = s.strokeColor && s.strokeColor !== 'default' ? s.strokeColor : '#8a8f98';
+    const label = `<b>${f.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</b>` + f.lines.map(l => `<br><font style="font-size:10px" color="#5b616b">${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</font>`).join('');
+    return `<mxCell id="zone_${xa(f.id)}" value="${xa(label)}" style="rounded=1;arcSize=3;html=1;whiteSpace=wrap;dashed=1;fillColor=${fill};fillOpacity=30;strokeColor=${stroke};verticalAlign=top;align=left;spacingLeft=8;spacingTop=2;fontSize=12;" vertex="1" parent="1"><mxGeometry x="${Math.round(f.x)}" y="${Math.round(f.y)}" width="${Math.round(f.w)}" height="${Math.round(f.h)}" as="geometry"/></mxCell>`;
+  };
+  const frames = (model.frames || []).map(frameCell);
+
+  // z-order: lanes/context boxes, then zone frames (frames go on top of lanes with low opacity so lane borders still show), connectors, shapes
+  for (const n of back) cells.push(vertex(n));
+  if (!hasLanes) cells.push(...frames);
+  else cells.push(...frames);
   for (const e of model.edges) {
     const pts = e.points.length ? `<Array as="points">${e.points.map(p => `<mxPoint x="${Math.round(p.x)}" y="${Math.round(p.y)}"/>`).join('')}</Array>` : '';
     const src = e.source ? ` source="${xa(e.source)}"` : '', tgt = e.target ? ` target="${xa(e.target)}"` : '';
-    cells.push(`<mxCell id="${xa(e.id)}" value="${xa(e.rawLabel || e.label || '')}" style="${xa(e.route ? e.styleStr.replace(/(exit|entry)(X|Y|Dx|Dy|Perimeter)=[^;]*;?/g, '') : e.styleStr)}" edge="1" parent="1"${src}${tgt}><mxGeometry relative="1" as="geometry">${pts}</mxGeometry></mxCell>`);
+    cells.push(`<mxCell id="${xa(e.id)}" value="${xa(e.rawLabel || e.label || '')}" style="${xa(edgeStyleFor(e, model.nodes))}" edge="1" parent="1"${src}${tgt}><mxGeometry relative="1" as="geometry">${pts}</mxGeometry></mxCell>`);
+  }
+  for (const n of front) cells.push(vertex(n));
+
+  if (heading && (heading.title || heading.subtitle)) {
+    const b = bounds(model, margin), w = Math.max(b.w - 2 * margin, 560);
+    const tl = heading.title ? wrapLines(heading.title, w, 21.6).length : 0, sl = heading.subtitle ? wrapLines(heading.subtitle, w, 12).length : 0;
+    const th = tl * 28, sh = sl * 17, top = b.y - th - sh - 16;
+    if (tl) cells.push(`<mxCell id="heading_title" value="${xa(heading.title)}" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=20;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="${Math.round(b.x + margin)}" y="${Math.round(top)}" width="${Math.round(w)}" height="${th}" as="geometry"/></mxCell>`);
+    if (sl) cells.push(`<mxCell id="heading_subtitle" value="${xa(heading.subtitle)}" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=12;fontColor=#5b616b;" vertex="1" parent="1"><mxGeometry x="${Math.round(b.x + margin)}" y="${Math.round(top + th + 2)}" width="${Math.round(w)}" height="${sh}" as="geometry"/></mxCell>`);
   }
   return `<mxfile host="diagram-viewer"><diagram name="${xa(name)}" id="view1"><mxGraphModel dx="0" dy="0" grid="1" gridSize="10" page="0" math="0" shadow="0"><root><mxCell id="0"/><mxCell id="1" parent="0"/>${cells.join('')}</root></mxGraphModel></diagram></mxfile>`;
 }
 
-const toSVG = (model, title) => renderSVG(model, { standalone: true, title }).svg;
+const toSVG = (model, title, opts = {}) => renderSVG(model, { standalone: true, title, ...opts }).svg;
 
 // ---- browser-only helpers ----
-function svgToPngBlob(svgString, scale = 2) {
+function svgToImageBlob(svgString, { scale = 2, type = 'image/png', background = '#ffffff' } = {}) {
   return new Promise((resolve, reject) => {
     const m = svgString.match(/width="(\d+)" height="(\d+)"/);
-    const w = +m[1] * scale, h = +m[2] * scale;
+    const w = Math.min(+m[1] * scale, 16000), h = Math.min(+m[2] * scale, 16000);
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas'); c.width = w; c.height = h;
-      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
-      c.toBlob(b => (b ? resolve(b) : reject(new Error('PNG encode failed'))), 'image/png');
+      const ctx = c.getContext('2d');
+      if (background && background !== 'none') { ctx.fillStyle = background; ctx.fillRect(0, 0, w, h); }
+      ctx.drawImage(img, 0, 0, w, h);
+      c.toBlob(b => (b ? resolve(b) : reject(new Error('Image encode failed'))), type, 0.92);
     };
     img.onerror = () => reject(new Error('SVG could not be rasterised'));
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
   });
+}
+const svgToPngBlob = (svg, scale = 2) => svgToImageBlob(svg, { scale });
+
+// vector PDF through the browser's print dialog ("Save as PDF"); a hidden iframe avoids popup blockers
+function printSvg(svgString, title = 'diagram') {
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const d = f.contentWindow.document;
+  const m = svgString.match(/width="(\d+)" height="(\d+)"/);
+  const landscape = !m || +m[1] >= +m[2];
+  d.open();
+  d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title.replace(/</g, '&lt;')}</title><style>@page{size:${landscape ? 'landscape' : 'portrait'};margin:10mm}html,body{margin:0}svg{width:100%;height:auto;max-height:190mm}</style></head><body>${svgString}</body></html>`);
+  d.close();
+  setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 300);
 }
 
 function download(name, data, type) {
@@ -7616,39 +8401,78 @@ const safeName = s => (String(s).replace(/[^\w\-. ]+/g, '_').trim() || 'view').s
 // ---- app: state, DOM wiring ----
 const $ = id => document.getElementById(id);
 const S = {
-  pages: [], page: 0, model: null, graph: null,
+  pages: [], page: 0, full: null, view: null, graph: null, zones: null,
+  hiddenLayers: new Set(), ctxLayers: new Set(), tidied: false, fileName: 'diagram',
   direction: 'both', depth: 2, infinite: false,
-  hover: null, pinned: null, blocked: new Set(), previewing: false, previewModel: null,
+  hover: null, pinned: null, finding: null, blocked: new Set(),
+  previewing: false, previewModel: null,
+  opt: { heading: true, title: '{service} — {direction} lineage ({hops})', subtitle: '{file} · {page} · {date}', tidy: true, lanes: true, zones: true, zoneMeta: true, focus: true,
+    wholeTitle: '{file} — {page}', wholeSubtitle: 'Layers: {layers} · {date}' },
+  metaKey: '', diag: null,
   els: { n: new Map(), e: new Map() }, hl: [], vb: null, bounds: null,
 };
 const SAMPLE_XML = "<mxfile>\n  <diagram name=\"Logging\" id=\"p1\">\n    <mxGraphModel>\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"zone\" value=\"Prod zone\" style=\"swimlane;html=1;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"40\" y=\"40\" width=\"520\" height=\"200\" as=\"geometry\"/></mxCell>\n        <object label=\"Firewall\" id=\"fw\" owner=\"NetSec\" classification=\"Internal\"><mxCell style=\"rounded=1;html=1;\" vertex=\"1\" parent=\"zone\"><mxGeometry x=\"20\" y=\"60\" width=\"100\" height=\"50\" as=\"geometry\"/></mxCell></object>\n        <mxCell id=\"coll\" value=\"Log Collector\" style=\"rounded=1;html=1;\" vertex=\"1\" parent=\"zone\"><mxGeometry x=\"200\" y=\"60\" width=\"100\" height=\"50\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"siem\" value=\"SIEM\" style=\"shape=cylinder3;html=1;\" vertex=\"1\" parent=\"zone\"><mxGeometry x=\"400\" y=\"50\" width=\"80\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"idp\" value=\"IdP\" style=\"ellipse;html=1;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"300\" width=\"80\" height=\"50\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"soar\" value=\"SOAR\" style=\"rhombus;html=1;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"600\" y=\"40\" width=\"90\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"e1\" value=\"syslog\" style=\"edgeStyle=orthogonalEdgeStyle;html=1;\" edge=\"1\" parent=\"1\" source=\"fw\" target=\"coll\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"e2\" value=\"\" style=\"html=1;\" edge=\"1\" parent=\"1\" source=\"coll\" target=\"siem\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"e3\" value=\"alerts\" style=\"html=1;\" edge=\"1\" parent=\"1\" source=\"siem\" target=\"soar\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"e4\" value=\"\" style=\"html=1;\" edge=\"1\" parent=\"1\"><mxGeometry relative=\"1\" as=\"geometry\"><mxPoint x=\"140\" y=\"325\" as=\"sourcePoint\"/><mxPoint x=\"440\" y=\"170\" as=\"targetPoint\"/></mxGeometry></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n";
+const DIR_TEXT = { up: 'upstream', down: 'downstream', both: 'upstream & downstream' };
 
 const focusId = () => S.pinned || S.hover;
 const curDepth = () => (S.infinite ? Infinity : S.depth);
 const labelOf = n => (n.text || '').split('\n')[0].trim() || `(${n.id})`;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const computeView = id => lineage(S.graph, id, { direction: S.direction, depth: curDepth(), blocked: S.blocked });
+const pageName = () => (S.pages[S.page] ? S.pages[S.page].name : '');
+const visibleLayerNames = () => (S.full.layers || []).filter(l => !S.hiddenLayers.has(l.id)).map(l => l.name).join(', ') || 'all';
 
-function computeView(id) {
-  return lineage(S.graph, id, { direction: S.direction, depth: curDepth(), blocked: S.blocked });
+// ---------- headings ----------
+function tokenCtx(id) {
+  const n = id && S.view.nodes.get(id);
+  return {
+    service: n ? labelOf(n) : 'Full diagram', direction: DIR_TEXT[S.direction],
+    hops: S.infinite ? 'all hops' : `${S.depth} hop${S.depth === 1 ? '' : 's'}`,
+    file: S.fileName, page: pageName(), date: todayStr(), layers: visibleLayerNames(),
+  };
+}
+const fillTokens = (str, ctx) => String(str).replace(/\{(\w+)\}/g, (m, k) => (k in ctx ? ctx[k] : m));
+function headingFor(id) {
+  if (!S.opt.heading) return null;
+  const c = tokenCtx(id);
+  return { title: fillTokens(S.opt.title, c).trim(), subtitle: fillTokens(S.opt.subtitle, c).trim() };
+}
+function wholeHeading() {
+  if (!S.opt.heading) return null;
+  const c = tokenCtx(null);
+  return { title: fillTokens(S.opt.wholeTitle, c).trim(), subtitle: fillTokens(S.opt.wholeSubtitle, c).trim() };
+}
+
+// ---------- theme ----------
+function applyTheme(mode) {
+  const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('theme').value = mode; S.theme = mode;
+  try { localStorage.setItem('lv-theme', mode); } catch (e) { /* storage unavailable */ }
+}
+function applyInvert(on) {
+  document.documentElement.dataset.invert = on ? '1' : '0'; $('invert').checked = on;
+  try { localStorage.setItem('lv-invert', on ? '1' : '0'); } catch (e) { /* storage unavailable */ }
 }
 
 // ---------- loading ----------
 async function loadText(text, name) {
-  try {
-    S.pages = loadDrawio(text, b => pako.inflateRaw(b));
-  } catch (err) { alert('Could not open file: ' + err.message); return; }
+  try { S.pages = loadDrawio(text, b => pako.inflateRaw(b)); }
+  catch (err) { alert('Could not open file: ' + err.message); return; }
   S.fileName = (name || 'diagram').replace(/\.[^.]+$/, '');
-  S.blocked.clear(); S.pinned = S.hover = null;
+  S.blocked.clear(); S.tidied = false;
   renderTabs(); selectPage(0);
 }
 
 function selectPage(i) {
-  S.page = i; S.previewing = false;
-  S.model = buildModel(S.pages[i].graph);
-  S.graph = buildGraph(S.model);
-  S.pinned = S.hover = null;
+  S.page = i; S.previewing = false; S.finding = null;
+  S.full = buildModel(S.pages[i].graph);
+  S.hiddenLayers = new Set((S.full.layers || []).filter(l => !l.visible).map(l => l.id));
+  S.ctxLayers = new Set(suggestContextLayers(S.full));
+  S.suggested = new Set(S.ctxLayers);
+  S.pinned = S.hover = null; S.tidied = false;
   [...$('tabs').children].forEach((b, j) => b.classList.toggle('on', j === i));
-  $('empty').hidden = true;
-  drawCanvas(S.model); renderList(); renderDiagnostics(); renderDetails(); updateButtons();
+  rebuildView(true);
 }
 
 function renderTabs() {
@@ -7657,31 +8481,57 @@ function renderTabs() {
   S.pages.forEach((p, i) => { const b = document.createElement('button'); b.textContent = p.name; b.onclick = () => selectPage(i); t.appendChild(b); });
 }
 
+// Everything derived from the layer choices and (optionally) tidied connectors.
+function rebuildView(fit) {
+  S.view = filterLayers(S.full, { hidden: S.hiddenLayers, context: S.ctxLayers });
+  if (S.tidied) rerouteAll(S.view);
+  S.graph = buildGraph(S.view);
+  S.zones = computeZones(S.view);
+  if (S.pinned && !S.graph.out.has(S.pinned)) S.pinned = null;
+  for (const id of [...S.blocked]) if (!S.graph.out.has(id)) S.blocked.delete(id);
+  S.hover = null; S.finding = null;
+  if (S.previewing && !S.pinned) S.previewing = false;
+  $('empty').hidden = true;
+  if (S.previewing) schedulePreview(0); else drawCanvas(S.view, {}, fit !== false && fit === true);
+  renderList(); renderLayers(); runChecks(); renderDetails(); updateChrome();
+}
+
 // ---------- canvas ----------
-function drawCanvas(model) {
-  const { svg, bounds: b } = renderSVG(model);
+function drawCanvas(model, opts = {}, doFit = true) {
+  const { svg, bounds: b } = renderSVG(model, opts);
+  const old = S.vb;
   $('canvasHost').innerHTML = svg;
   const el = $('canvasHost').firstElementChild;
   S.els = { n: new Map(), e: new Map() };
   el.querySelectorAll('.n').forEach(g => S.els.n.set(g.dataset.id, g));
   el.querySelectorAll('.e').forEach(g => S.els.e.set(g.dataset.id, g));
-  S.hl = []; S.bounds = b; fit();
-  $('empty').hidden = true;
+  S.hl = []; S.bounds = b;
+  if (doFit || !old) fit(); else { S.vb = old; applyVB(); }
+  for (const id of S.blocked) { const g = S.els.n.get(id); if (g) g.classList.add('blk'); }
+  if (!S.previewing) refresh();
 }
 
-function fit() {
+function fit(b) {
   const svg = $('canvasHost').firstElementChild; if (!svg) return;
-  const r = svg.getBoundingClientRect(), b = S.bounds;
+  b = b || S.bounds;
+  const r = svg.getBoundingClientRect();
   const k = Math.max(b.w / r.width, b.h / r.height);
   const w = r.width * k, h = r.height * k;
   S.vb = { x: b.x + b.w / 2 - w / 2, y: b.y + b.h / 2 - h / 2, w, h };
   applyVB();
 }
 function applyVB() {
-  const svg = $('canvasHost').firstElementChild; if (!svg) return;
+  const svg = $('canvasHost').firstElementChild; if (!svg || !S.vb) return;
   const r = svg.getBoundingClientRect(), v = S.vb;
   if (r.width) v.h = v.w * (r.height / r.width);
   svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+}
+function fitRects(rects, pad = 90) {
+  if (!rects.length) return;
+  const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y));
+  const x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.h));
+  const w = Math.max(x1 - x0 + 2 * pad, 520), h = Math.max(y1 - y0 + 2 * pad, 320);
+  fit({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h });
 }
 
 function setupCanvasEvents() {
@@ -7710,7 +8560,7 @@ function setupCanvasEvents() {
     if (!drag) return;
     const was = drag; drag = null;
     const svg = host.firstElementChild; if (svg) svg.classList.remove('drag');
-    if (was.moved || S.previewing) return;
+    if (was.moved || S.previewing || !host.contains(ev.target)) return;
     const g = ev.target.closest && ev.target.closest('.n:not(.grp)');
     pin(g ? g.dataset.id : null);
   });
@@ -7722,6 +8572,7 @@ function setupCanvasEvents() {
   });
   host.addEventListener('mouseleave', () => { if (S.hover) { S.hover = null; if (!S.pinned) refresh(); } });
   host.addEventListener('contextmenu', ev => {
+    if (S.previewing) return;
     const g = ev.target.closest && ev.target.closest('.n:not(.grp)');
     if (!g) return;
     ev.preventDefault();
@@ -7732,48 +8583,66 @@ function setupCanvasEvents() {
 }
 
 // ---------- focus / highlight ----------
-function pin(id) { S.pinned = id; if (!id) S.hover = null; refresh(); }
+function pin(id) { S.pinned = id; if (!id) { S.hover = null; S.finding = null; } refresh(); }
+
+function addHl(g, f) { if (g) { g.classList.add('hl'); if (f) g.classList.add(f); S.hl.push(g); } }
 
 function refresh() {
   const svg = $('canvasHost').firstElementChild; if (!svg) return;
-  for (const g of S.hl) g.classList.remove('hl', 'f');
+  for (const g of S.hl) g.classList.remove('hl', 'f', 'dx');
   S.hl = [];
   const id = S.previewing ? null : focusId();
-  svg.classList.toggle('focus', !!id);
+  const fin = !id && !S.previewing ? S.finding : null;
+  svg.classList.toggle('focus', !!id || !!fin);
   if (id && S.graph.out.has(id)) {
     const v = computeView(id);
-    for (const [nid] of v.nodes) { const g = S.els.n.get(nid); if (g) { g.classList.add('hl'); if (nid === id) g.classList.add('f'); S.hl.push(g); } }
-    for (const eid of v.edges) { const g = S.els.e.get(eid); if (g) { g.classList.add('hl'); S.hl.push(g); } }
-    // containers holding highlighted nodes stay visible as context
-    for (const [gid, g] of S.els.n) if (S.model.nodes.get(gid)?.isGroup) {
-      const keep = [...v.nodes.keys()].some(nid => isInside(nid, gid));
-      if (keep) { g.classList.add('hl'); S.hl.push(g); }
+    const nodes = [...v.nodes.keys()];
+    for (const nid of nodes) addHl(S.els.n.get(nid), nid === id ? 'f' : null);
+    for (const eid of v.edges) addHl(S.els.e.get(eid));
+    // containers and zone boxes holding highlighted shapes stay visible as context
+    for (const [gid, g] of S.els.n) {
+      const n = S.view.nodes.get(gid);
+      if (n && n.isGroup && nodes.some(nid => isInside(nid, gid))) addHl(g);
     }
+    for (const nid of nodes) for (const z of S.zones.chain(nid)) addHl(S.els.n.get(z));
+  } else if (fin) {
+    for (const nid of fin.nodes) addHl(S.els.n.get(nid), 'dx');
+    for (const eid of fin.edges) addHl(S.els.e.get(eid), 'dx');
   }
-  $('banner').hidden = !id && !S.previewing;
-  if (S.previewing) $('banner').textContent = 'Service view preview — click “Preview view” to return';
-  else if (id) $('banner').textContent = `${labelOf(S.model.nodes.get(id))} · ${S.direction} · ${S.infinite ? '∞' : S.depth} hop${!S.infinite && S.depth === 1 ? '' : 's'}${S.pinned ? ' · pinned (Esc to clear)' : ''}`;
-  renderDetails(); updateButtons();
+  updateChrome();
+  renderDetails();
   [...$('list').children].forEach(li => li.classList.toggle('sel', li.dataset.id === S.pinned));
 }
-function isInside(nid, gid) { let n = S.model.nodes.get(nid); while (n && n.parent) { if (n.parent === gid) return true; n = S.model.nodes.get(n.parent); } return false; }
+function isInside(nid, gid) { let n = S.view.nodes.get(nid); while (n && n.parent) { if (n.parent === gid) return true; n = S.view.nodes.get(n.parent); } return false; }
 
-function updateButtons() {
-  const has = !!S.pinned;
-  $('preview').disabled = !has && !S.previewing;
-  $('export').disabled = !S.model;
+function updateChrome() {
+  const banner = $('banner');
+  const id = S.previewing ? null : focusId();
+  let text = '';
+  if (S.previewing) text = `Service view: ${labelOf(S.view.nodes.get(S.pinned))}`;
+  else if (id && S.view.nodes.has(id)) text = `${labelOf(S.view.nodes.get(id))} · ${DIR_TEXT[S.direction]} · ${S.infinite ? 'all' : S.depth} hop${!S.infinite && S.depth === 1 ? '' : 's'}${S.pinned ? ' · pinned (Esc to clear)' : ''}`;
+  else if (S.finding) text = S.finding.label + ' (Esc to clear)';
+  banner.hidden = !text; banner.textContent = text;
+  $('viewbar').hidden = !S.previewing;
+  $('preview').disabled = !S.pinned && !S.previewing;
+  $('preview').textContent = S.previewing ? 'Back to diagram' : 'Preview view';
+  $('preview').classList.toggle('on-state', S.previewing);
+  $('export').disabled = !S.view;
+  $('tidy').disabled = !S.view || S.previewing;
+  $('tidy').textContent = S.tidied ? 'Original connectors' : 'Tidy connectors';
+  $('tidy').classList.toggle('on-state', S.tidied);
 }
 
 // ---------- panels ----------
 function renderList() {
   const q = $('search').value.trim().toLowerCase();
   const ul = $('list'); ul.innerHTML = '';
-  const items = [...S.model.nodes.values()].filter(n => !n.isGroup && !n.style.text && (n.text || n.id)).sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
+  const items = [...S.view.nodes.values()].filter(n => !n.isGroup && !n.ctxBox && !n.style.text && (n.text || n.id)).sort((a, b) => labelOf(a).localeCompare(labelOf(b)));
   for (const n of items) {
     const hay = (n.text + ' ' + Object.values(n.meta).join(' ')).toLowerCase();
     if (q && !hay.includes(q)) continue;
     const li = document.createElement('li'); li.textContent = labelOf(n); li.dataset.id = n.id; li.title = n.text;
-    li.onclick = () => { S.previewing = false; pin(n.id); centerOn(n); };
+    li.onclick = () => { if (S.previewing) backToDiagram(); pin(n.id); centerOn(n); };
     ul.appendChild(li);
   }
 }
@@ -7782,115 +8651,228 @@ function centerOn(n) {
   const v = S.vb; v.x = n.x + n.w / 2 - v.w / 2; v.y = n.y + n.h / 2 - v.h / 2; applyVB();
 }
 
-function renderDiagnostics() {
-  const d = S.model.diagnostics, b = $('diagBody');
-  const li = (ids, t) => ids.length ? `<h4>${t} (${ids.length})</h4><ul>${ids.map(id => `<li data-id="${esc(id)}">${esc(S.model.nodes.has(id) ? labelOf(S.model.nodes.get(id)) : id)}</li>`).join('')}</ul>` : '';
-  b.innerHTML = `<p class="hint">${S.model.nodes.size - S.model.groups.size} shapes · ${S.model.edges.length} connections</p>`
-    + li(d.inferredEdges.map(id => S.model.edges.find(e => e.id === id)?.target || id), 'Edges attached by proximity (dashed)')
-    + (d.danglingEdges.length ? `<h4>Unattached edges (${d.danglingEdges.length})</h4><p class="hint">One or both ends connect to nothing, so they are excluded from lineage.</p>` : '')
-    + li(d.unconnected, 'Shapes with no connections')
-    + (d.duplicateLabels.length ? `<h4>Duplicate labels (${d.duplicateLabels.length})</h4><ul>${d.duplicateLabels.map(x => `<li data-id="${esc(x.ids[0])}">${esc(x.label)} ×${x.ids.length}</li>`).join('')}</ul>` : '');
-  b.querySelectorAll('li').forEach(el => el.onclick = () => { const n = S.model.nodes.get(el.dataset.id); if (n) { pin(n.id); centerOn(n); } });
+function renderLayers() {
+  const box = $('layerList'), layers = S.full.layers || [];
+  if (layers.length < 2) { box.innerHTML = '<p class="hint">This diagram has a single layer.</p>'; return; }
+  box.innerHTML = layers.map(l => `<div class="lrow">
+    <label class="name"><input type="checkbox" data-show="${esc(l.id)}" ${S.hiddenLayers.has(l.id) ? '' : 'checked'}> ${esc(l.name)}</label>
+    <small>${l.nodes} shape${l.nodes === 1 ? '' : 's'} · ${l.edges} connector${l.edges === 1 ? '' : 's'}</small>
+    <label class="frame" title="Keep this layer's boxes as labelled frames around the shapes they contain, in service views"><input type="checkbox" data-frame="${esc(l.id)}" ${S.ctxLayers.has(l.id) ? 'checked' : ''}> frame in service views ${S.suggested && S.suggested.has(l.id) ? '<em>suggested</em>' : ''}</label>
+  </div>`).join('');
+  box.querySelectorAll('input[data-show]').forEach(c => c.onchange = () => { c.checked ? S.hiddenLayers.delete(c.dataset.show) : S.hiddenLayers.add(c.dataset.show); rebuildView(false); });
+  box.querySelectorAll('input[data-frame]').forEach(c => c.onchange = () => { c.checked ? S.ctxLayers.add(c.dataset.frame) : S.ctxLayers.delete(c.dataset.frame); rebuildView(false); });
 }
 
 function renderDetails() {
-  const id = focusId(), box = $('details');
-  if (!id || !S.model.nodes.has(id)) { box.innerHTML = '<p class="hint">Hover or select a shape to see its inputs and outputs.</p>'; return; }
-  const n = S.model.nodes.get(id), v = computeView(id);
+  const id = S.previewing ? null : focusId(), box = $('details');
+  if (!id || !S.view.nodes.has(id)) { box.innerHTML = '<p class="hint">Hover or select a shape to see its inputs and outputs.</p>'; return; }
+  const n = S.view.nodes.get(id), v = computeView(id);
   const rows = Object.entries(n.meta).map(([k, val]) => `<tr><td>${esc(k)}</td><td>${esc(val)}</td></tr>`).join('');
+  const layer = (S.full.layers || []).find(l => l.id === n.layer);
+  const zones = S.zones.chain(id).reverse().map(zid => {
+    const z = S.zones.zones.get(zid).node, props = Object.entries(z.meta).map(([k, val]) => `${esc(k)}: ${esc(val)}`).join(' · ');
+    return `<div class="zone"><b>${esc(labelOf(z))}</b>${props ? `<br><small class="hint">${props}</small>` : ''}</div>`;
+  }).join('');
   const list = dir => {
     const items = [...v.nodes].filter(([nid]) => nid !== id && reach(id, nid, dir)).sort((a, b) => a[1] - b[1]);
-    return items.length ? `<ul class="lin">${items.map(([nid, d]) => `<li data-id="${esc(nid)}">${esc(labelOf(S.model.nodes.get(nid)))} <small>${d} hop${d > 1 ? 's' : ''}</small></li>`).join('')}</ul>` : '<p class="hint">none</p>';
+    return items.length ? `<ul class="lin">${items.map(([nid, d]) => `<li data-id="${esc(nid)}">${esc(labelOf(S.view.nodes.get(nid)))} <small>${d} hop${d > 1 ? 's' : ''}</small></li>`).join('')}</ul>` : '<p class="hint">none</p>';
   };
-  box.innerHTML = `<h3>${esc(labelOf(n))}</h3>${rows ? `<table>${rows}</table>` : ''}`
+  box.innerHTML = `<h3>${esc(labelOf(n))}</h3>${layer && (S.full.layers || []).length > 1 ? `<p class="hint">Layer: ${esc(layer.name)}</p>` : ''}${rows ? `<table>${rows}</table>` : ''}`
+    + (zones ? `<h4>Zones</h4>${zones}` : '')
     + (S.direction !== 'down' ? `<h4>Inputs (upstream)</h4>${list('up')}` : '')
     + (S.direction !== 'up' ? `<h4>Outputs (downstream)</h4>${list('down')}` : '')
     + `<p class="hint">${S.blocked.has(id) ? 'Traversal stops at this shape (right-click to undo).' : ''}</p>`;
-  box.querySelectorAll('li').forEach(el => el.onclick = () => { const t = S.model.nodes.get(el.dataset.id); if (t) { pin(t.id); } });
+  box.querySelectorAll('li').forEach(el => el.onclick = () => { const t = S.view.nodes.get(el.dataset.id); if (t) pin(t.id); });
 }
 const _reach = new Map();
-function reach(from, to, dir) { // is `to` upstream/downstream of `from` within the current view?
-  const k = from + '|' + dir + '|' + curDepth();
+function reach(from, to, dir) {
+  const k = from + '|' + dir + '|' + curDepth() + '|' + [...S.blocked].join(',');
   if (!_reach.has(k)) { _reach.clear(); _reach.set(k, lineage(S.graph, from, { direction: dir, depth: curDepth(), blocked: S.blocked }).nodes); }
   return _reach.get(k).has(to);
 }
 
+// ---------- checks ----------
+function runChecks() {
+  S.diag = diagnose(S.view, { metaKey: S.metaKey, zones: S.zones, routes: true });
+  renderChecks();
+}
+function renderChecks() {
+  const d = S.diag, sel = $('metaKey');
+  const keep = S.metaKey;
+  sel.innerHTML = '<option value="">(none)</option>' + d.metaKeys.map(k => `<option value="${esc(k.key)}" ${k.key === keep ? 'selected' : ''}>${esc(k.key)} (${k.count})</option>`).join('');
+  $('chkSummary').innerHTML = `<span class="hint">${d.summary.shapes} shapes · ${d.summary.connectors} connectors</span> `
+    + ['error', 'warn', 'info'].map(s => `<span class="chip ${s}">${d.counts[s]} ${s === 'warn' ? 'warnings' : s === 'error' ? 'errors' : 'notes'}</span>`).join('');
+  const b = $('chkBadge'); const bad = d.counts.error + d.counts.warn; b.hidden = !bad; b.textContent = bad;
+  b.style.background = d.counts.error ? 'var(--err)' : 'var(--warn)';
+  $('checkList').innerHTML = d.findings.map((f, fi) => `<details ${f.severity === 'error' ? 'open' : ''}>
+    <summary><span class="sev ${f.severity}"></span>${esc(f.title)}<b>${f.items.length || ''}</b></summary>
+    <p class="hint">${esc(f.help)}</p>
+    <ul>${f.items.slice(0, 40).map((it, ii) => `<li data-f="${fi}" data-i="${ii}">${esc(it.label)}${it.note ? `<small>${esc(it.note)}</small>` : ''}</li>`).join('')}${f.items.length > 40 ? `<li class="hint" data-more="${fi}">… ${f.items.length - 40} more (see report)</li>` : ''}</ul></details>`).join('')
+    || '<p class="hint">No problems found.</p>';
+}
+function showFinding(fi, ii) {
+  const it = S.diag.findings[fi].items[ii]; if (!it) return;
+  if (S.previewing) backToDiagram();
+  S.pinned = null; S.hover = null; S.finding = it;
+  refresh();
+  const rects = [];
+  for (const id of it.nodes) { const n = S.view.nodes.get(id); if (n) rects.push(n); }
+  for (const eid of it.edges) { const e = S.view.edges.find(x => x.id === eid); if (e) for (const p of routeEdge(e, S.view.nodes)) rects.push({ x: p.x, y: p.y, w: 0, h: 0 }); }
+  if (it.point) rects.push({ x: it.point.x - 30, y: it.point.y - 30, w: 60, h: 60 });
+  fitRects(rects);
+}
+
 // ---------- service views & export ----------
-async function buildView(id, { tidy, zones }) {
+async function buildView(id) {
   const v = computeView(id);
-  let sub = subModel(S.model, v.nodes.keys(), v.edges, { keepGroups: zones });
-  if (tidy) sub = await tidyModel(sub, ELK, { focus: id });
+  let sub = subModel(S.view, v.nodes.keys(), v.edges, { keepGroups: S.opt.lanes, zones: S.opt.zones && S.zones.zones.size ? S.zones : null, frameMeta: S.opt.zoneMeta });
+  sub.layers = S.view.layers;
+  if (S.opt.tidy) { sub = await tidyModel(sub, ELK, { focus: id }); sub.layers = S.view.layers; }
   return sub;
 }
-const viewName = id => `${safeName(S.fileName)}__${safeName(labelOf(S.model.nodes.get(id)))}__${S.direction}-${S.infinite ? 'all' : S.depth}`;
+const viewName = id => `${safeName(S.fileName)}__${safeName(labelOf(S.view.nodes.get(id)))}__${S.direction}-${S.infinite ? 'all' : S.depth}`;
 
-async function togglePreview() {
-  if (S.previewing) { S.previewing = false; drawCanvas(S.model); refresh(); return; }
-  if (!S.pinned) return;
-  const sub = await buildView(S.pinned, { tidy: $('optTidy').checked, zones: $('optZones').checked });
-  S.previewing = true; S.previewModel = sub; drawCanvas(sub);
-  $('banner').hidden = false; $('banner').textContent = 'Service view preview — click “Preview view” to return';
-  $('preview').disabled = false;
+let previewTimer = null, previewSeq = 0;
+function schedulePreview(ms = 200) { clearTimeout(previewTimer); previewTimer = setTimeout(renderPreview, ms); }
+async function renderPreview() {
+  const id = S.pinned, seq = ++previewSeq; if (!id) return;
+  try {
+    const sub = await buildView(id);
+    if (seq !== previewSeq || !S.previewing) return;
+    S.previewModel = sub;
+    drawCanvas(sub, { heading: headingFor(id), focusId: S.opt.focus ? id : null }, true);
+    updateChrome();
+  } catch (err) { $('banner').hidden = false; $('banner').textContent = 'Preview failed: ' + err.message; }
 }
+function startPreview() { if (!S.pinned) return; S.previewing = true; syncOptInputs(); updateChrome(); renderPreview(); }
+function backToDiagram() { S.previewing = false; previewSeq++; drawCanvas(S.view, {}, true); updateChrome(); }
+const togglePreview = () => (S.previewing ? backToDiagram() : startPreview());
 
-async function emit(sub, base, fmt, out) {
-  if (fmt.svg || fmt.png) {
-    const svg = toSVG(sub, base);
-    if (fmt.svg) out.push([base + '.svg', svg, 'image/svg+xml']);
-    if (fmt.png) out.push([base + '.png', await svgToPngBlob(svg, 2), 'image/png']);
-  }
-  if (fmt.dio) out.push([base + '.drawio', toDrawio(sub, { name: base }), 'application/xml']);
+const fmts = () => ({ svg: $('fSvg').checked, png: $('fPng').checked, dio: $('fDio').checked, pdf: $('fPdf').checked, scale: +$('fScale').value, bg: $('fBg').value });
+
+async function emit(sub, base, fmt, out, extra) {
+  const svg = toSVG(sub, base, { heading: extra.heading, focusId: extra.focusId, background: fmt.bg });
+  if (fmt.svg) out.push([base + '.svg', svg, 'image/svg+xml']);
+  if (fmt.png) out.push([base + '.png', await svgToImageBlob(svg, { scale: fmt.scale, background: fmt.bg }), 'image/png']);
+  if (fmt.dio) out.push([base + '.drawio', toDrawio(sub, { name: base, heading: extra.heading, focusId: extra.focusId }), 'application/xml']);
+  if (fmt.pdf && extra.print) printSvg(svg, base);
 }
-const fmts = () => ({ svg: $('fSvg').checked, png: $('fPng').checked, dio: $('fDio').checked });
-const opts = () => ({ tidy: $('optTidy').checked, zones: $('optZones').checked });
 
 async function exportCurrent() {
-  const id = S.pinned; if (!id) { $('dlgMsg').textContent = 'Pin a shape first (click it).'; return; }
-  $('dlgMsg').textContent = 'Working…';
+  const whole = document.querySelector('input[name=scope]:checked').value === 'whole';
+  const msg = $('dlgMsg');
+  if (!whole && !S.pinned) { msg.textContent = 'Pin a shape first (click it), or choose “Whole diagram”.'; return; }
+  const fmt = fmts();
+  if (!fmt.svg && !fmt.png && !fmt.dio && !fmt.pdf) { msg.textContent = 'Choose at least one format.'; return; }
+  msg.textContent = 'Working…';
   try {
-    const out = []; await emit(await buildView(id, opts()), viewName(id), fmts(), out);
+    const out = [];
+    if (whole) await emit(S.view, `${safeName(S.fileName)}__${safeName(pageName())}`, fmt, out, { heading: wholeHeading(), focusId: null, print: true });
+    else await emit(S.previewing && S.previewModel ? S.previewModel : await buildView(S.pinned), viewName(S.pinned), fmt, out, { heading: headingFor(S.pinned), focusId: S.opt.focus ? S.pinned : null, print: true });
     for (const [n, d, t] of out) download(n, d, t);
-    $('dlgMsg').textContent = `Exported ${out.length} file(s).`;
-  } catch (err) { $('dlgMsg').textContent = 'Export failed: ' + err.message; }
+    msg.textContent = (out.length ? `Exported ${out.length} file(s)` : 'Nothing downloaded') + (fmt.pdf ? '; in the print dialog choose “Save as PDF”.' : '.');
+  } catch (err) { msg.textContent = 'Export failed: ' + err.message; }
 }
 
 async function exportAll() {
   const q = $('search').value.trim().toLowerCase();
-  const ids = [...S.model.nodes.values()].filter(n => !n.isGroup && S.graph.out.get(n.id).length + S.graph.inn.get(n.id).length > 0
+  const ids = [...S.view.nodes.values()].filter(n => !n.isGroup && !n.ctxBox && !n.style.text && S.graph.out.get(n.id).length + S.graph.inn.get(n.id).length > 0
     && (!q || (n.text + ' ' + Object.values(n.meta).join(' ')).toLowerCase().includes(q))).map(n => n.id);
-  if (!ids.length) { $('dlgMsg').textContent = 'No connected shapes match.'; return; }
+  const msg = $('dlgMsg'), fmt = fmts();
+  if (!ids.length) { msg.textContent = 'No connected shapes match.'; return; }
+  fmt.pdf = false;
   const zip = new JSZip(), used = new Set();
   try {
     for (let i = 0; i < ids.length; i++) {
-      $('dlgMsg').textContent = `Building ${i + 1} / ${ids.length}…`;
+      msg.textContent = `Building ${i + 1} / ${ids.length}…`;
       await new Promise(r => setTimeout(r));
       const out = []; let base = viewName(ids[i]); while (used.has(base)) base += '_'; used.add(base);
-      await emit(await buildView(ids[i], opts()), base, fmts(), out);
+      await emit(await buildView(ids[i]), base, fmt, out, { heading: headingFor(ids[i]), focusId: S.opt.focus ? ids[i] : null });
       for (const [n, d] of out) zip.file(n, d);
     }
     download(`${safeName(S.fileName)}__service-views.zip`, await zip.generateAsync({ type: 'blob' }));
-    $('dlgMsg').textContent = `Zipped ${ids.length} service views.`;
-  } catch (err) { $('dlgMsg').textContent = 'Batch failed: ' + err.message; }
+    msg.textContent = `Zipped ${ids.length} service views.`;
+  } catch (err) { msg.textContent = 'Batch failed: ' + err.message; }
+}
+
+function openExport() {
+  $('scopeView').textContent = S.pinned ? `This service view: ${labelOf(S.view.nodes.get(S.pinned))}, ${DIR_TEXT[S.direction]}, ${S.infinite ? 'all' : S.depth} hop(s)` : 'This service view (pin a shape first)';
+  document.querySelector('input[name=scope][value=view]').checked = !!S.pinned;
+  document.querySelector('input[name=scope][value=whole]').checked = !S.pinned;
+  syncScope(); $('dHeading').checked = S.opt.heading; $('dlgMsg').textContent = '';
+  $('wTitle').value = S.opt.wholeTitle; $('wSubtitle').value = S.opt.wholeSubtitle;
+  $('dlg').showModal();
+}
+function syncScope() { $('wholeHeading').hidden = document.querySelector('input[name=scope]:checked').value !== 'whole'; }
+
+// ---------- view options ----------
+function syncOptInputs() {
+  const o = S.opt;
+  $('oHeading').checked = o.heading; $('oTitle').value = o.title; $('oSubtitle').value = o.subtitle;
+  $('oTidy').checked = o.tidy; $('oLanes').checked = o.lanes; $('oZones').checked = o.zones; $('oZoneMeta').checked = o.zoneMeta; $('oFocus').checked = o.focus;
+  $('oTitle').disabled = $('oSubtitle').disabled = !o.heading;
+}
+function readOptInputs() {
+  const o = S.opt;
+  o.heading = $('oHeading').checked; o.title = $('oTitle').value; o.subtitle = $('oSubtitle').value;
+  o.tidy = $('oTidy').checked; o.lanes = $('oLanes').checked; o.zones = $('oZones').checked; o.zoneMeta = $('oZoneMeta').checked; o.focus = $('oFocus').checked;
+  $('oTitle').disabled = $('oSubtitle').disabled = !o.heading;
+  if (S.previewing) schedulePreview();
 }
 
 // ---------- wiring ----------
+function setDir(v) { S.direction = v; [...$('dir').children].forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (S.view) { if (S.previewing) schedulePreview(0); refresh(); } }
+function setDepth(d) { S.depth = Math.min(8, d); S.infinite = false; $('inf').checked = false; $('depth').value = S.depth; $('depthOut').textContent = S.depth; if (S.view) { if (S.previewing) schedulePreview(0); refresh(); } }
+
 function init() {
   setupCanvasEvents();
+  let mode = 'auto', inv = true;
+  try { mode = localStorage.getItem('lv-theme') || 'auto'; inv = localStorage.getItem('lv-invert') !== '0'; } catch (e) { /* storage unavailable */ }
+  applyTheme(mode); applyInvert(inv);
+  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.theme === 'auto') applyTheme('auto'); });
+  $('theme').onchange = e => applyTheme(e.target.value);
+  $('invert').onchange = e => applyInvert(e.target.checked);
+
   $('open').onclick = () => $('file').click();
   $('file').onchange = async e => { const f = e.target.files[0]; if (f) loadText(await f.text(), f.name); e.target.value = ''; };
   $('sample').onclick = () => loadText(SAMPLE_XML, 'sample');
-  $('fit').onclick = fit;
-  $('search').oninput = () => S.model && renderList();
+  $('fit').onclick = () => fit();
+  $('search').oninput = () => S.view && renderList();
   $('dir').onclick = e => { const b = e.target.closest('button'); if (b) setDir(b.dataset.v); };
   $('depth').oninput = e => setDepth(+e.target.value);
-  $('inf').onchange = e => { S.infinite = e.target.checked; refresh(); };
+  $('inf').onchange = e => { S.infinite = e.target.checked; if (S.previewing) schedulePreview(0); refresh(); };
+  $('tidy').onclick = () => {
+    if (!S.view) return;
+    S.tidied = !S.tidied;
+    $('banner').hidden = false; $('banner').textContent = S.tidied ? 'Rerouting connectors…' : 'Restoring original connectors…';
+    setTimeout(() => rebuildView(false), 30);
+  };
   $('preview').onclick = togglePreview;
-  $('export').onclick = () => { $('dlgScope').textContent = S.pinned ? `Current view: ${labelOf(S.model.nodes.get(S.pinned))}, ${S.direction}, ${S.infinite ? 'all' : S.depth} hop(s).` : 'Pin a shape (click) to export its view, or export every service.'; $('dlgMsg').textContent = ''; $('dlg').showModal(); };
+  $('vbTitle').onclick = () => { const c = $('viewbar').classList.toggle('collapsed'); $('vbTitle').textContent = c ? 'Service view ▸' : 'Service view ▾'; };
+  $('export').onclick = openExport; $('vbExport').onclick = openExport; $('vbBack').onclick = backToDiagram;
   $('doExport').onclick = exportCurrent; $('doBatch').onclick = exportAll;
+  document.querySelectorAll('input[name=scope]').forEach(r => r.onchange = syncScope);
+  $('dHeading').onchange = e => { S.opt.heading = e.target.checked; };
+  $('wTitle').oninput = e => { S.opt.wholeTitle = e.target.value; }; $('wSubtitle').oninput = e => { S.opt.wholeSubtitle = e.target.value; };
+  ['oHeading', 'oTitle', 'oSubtitle', 'oTidy', 'oLanes', 'oZones', 'oZoneMeta', 'oFocus'].forEach(id => { $(id).oninput = $(id).onchange = readOptInputs; });
+  syncOptInputs();
+
+  document.querySelectorAll('.ltabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.ltabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.tab').forEach(t => { t.hidden = t.id !== 'tab-' + b.dataset.tab; });
+  });
+  $('metaKey').onchange = e => { S.metaKey = e.target.value; runChecks(); };
+  $('chkRun').onclick = () => S.view && runChecks();
+  const rep = () => ({ file: S.fileName, page: pageName() });
+  $('chkMd').onclick = () => S.diag && download(`${safeName(S.fileName)}__checks.md`, findingsToMarkdown(S.diag, rep()), 'text/markdown');
+  $('chkCsv').onclick = () => S.diag && download(`${safeName(S.fileName)}__checks.csv`, findingsToCsv(S.diag), 'text/csv');
+  $('checkList').onclick = e => { const li = e.target.closest('li[data-f]'); if (li) showFinding(+li.dataset.f, +li.dataset.i); };
+
   window.addEventListener('resize', applyVB);
   window.addEventListener('keydown', e => {
-    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox') return;
-    if (e.key === 'Escape') { if (S.previewing) togglePreview(); else pin(null); }
+    const t = document.activeElement, typing = t && ((/INPUT|TEXTAREA|SELECT/.test(t.tagName) && !['range', 'checkbox', 'radio'].includes(t.type)));
+    if (typing || $('dlg').open) return;
+    if (e.key === 'Escape') { if (S.previewing) backToDiagram(); else pin(null); }
     else if (/^[1-9]$/.test(e.key)) setDepth(+e.key);
     else if (e.key === 'u') setDir('up'); else if (e.key === 'd') setDir('down'); else if (e.key === 'b') setDir('both');
   });
@@ -7900,8 +8882,6 @@ function init() {
   st.addEventListener('drop', async e => { const f = e.dataTransfer.files[0]; if (f) loadText(await f.text(), f.name); });
   if (!SAMPLE_XML) $('sample').hidden = true;
 }
-function setDir(v) { S.direction = v; [...$('dir').children].forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (S.model) refresh(); }
-function setDepth(d) { S.depth = Math.min(8, d); S.infinite = false; $('inf').checked = false; $('depth').value = S.depth; $('depthOut').textContent = S.depth; if (S.model) refresh(); }
 init();
 
 })();</script>

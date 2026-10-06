@@ -58,7 +58,7 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
     const style = a.style || '';
     const sm = parseStyle(style);
     cells.set(id, {
-      id, parent: a.parent, vertex: a.vertex === '1', edge: a.edge === '1',
+      id, parent: a.parent, vertex: a.vertex === '1', edge: a.edge === '1', visible: a.visible !== '0',
       source: a.source, target: a.target, styleStr: style, style: sm,
       raw: label !== null ? label : (a.value || el.attrs.label || ''), meta,
       geo: geo ? { x: num(geo.attrs.x), y: num(geo.attrs.y), w: num(geo.attrs.width), h: num(geo.attrs.height), relative: geo.attrs.relative === '1', ...ptsOf(geo) } : null,
@@ -70,6 +70,16 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
     let x = 0, y = 0, c = cells.get(id), guard = 0;
     while (c && c.vertex && guard++ < 100) { x += c.geo ? c.geo.x : 0; y += c.geo ? c.geo.y : 0; c = cells.get(c.parent); }
     return { x, y };
+  };
+
+  // layers are the cells whose parent is the root cell; every other cell belongs to the layer at the top of its parent chain
+  const layers = [...cells.values()].filter(c => c.parent === '0' && !c.vertex && !c.edge && c.id !== '0')
+    .map((c, i) => ({ id: c.id, name: (c.raw || '').trim() || `Layer ${i + 1}`, visible: c.visible, order: i, nodes: 0, edges: 0 }));
+  const layerIds = new Set(layers.map(l => l.id));
+  const layerOfCell = id => {
+    let c = cells.get(id), guard = 0;
+    while (c && guard++ < 200) { if (layerIds.has(c.id)) return c.id; c = cells.get(c.parent); }
+    return layers.length ? layers[0].id : null;
   };
 
   const diagnostics = { inferredEdges: [], danglingEdges: [], unconnected: [], duplicateLabels: [] };
@@ -89,7 +99,7 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
       x: (v.geo ? v.geo.x : 0) + o.x, y: (v.geo ? v.geo.y : 0) + o.y,
       w: v.geo ? v.geo.w : 80, h: v.geo ? v.geo.h : 40,
       parent: cells.get(v.parent) && cells.get(v.parent).vertex ? v.parent : null,
-      isContainer: childOfVertex.has(v.id), order: nodes.size,
+      isContainer: childOfVertex.has(v.id), order: nodes.size, layer: layerOfCell(v.id),
     });
   }
 
@@ -124,14 +134,14 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
     if (!source) { const s = snap(shift(g.src) || points[0]); if (s) { source = s; inferred = true; } }
     if (!target) { const t = snap(shift(g.tgt) || points[points.length - 1]); if (t) { target = t; inferred = true; } }
     const e = {
-      id: c.id, source, target, style: c.style, styleStr: c.styleStr, points, inferred,
+      id: c.id, layer: layerOfCell(c.id), source, target, style: c.style, styleStr: c.styleStr, points, inferred,
       srcPoint: shift(g.src), tgtPoint: shift(g.tgt),
       label: htmlToText(c.raw, c.style.html === '1') || edgeLabelFor.get(c.id) || '', rawLabel: c.raw, meta: c.meta || {},
     };
     const fwd = c.style.endArrow !== 'none', back = c.style.startArrow !== undefined && c.style.startArrow !== 'none';
     e.fwd = fwd; e.back = back;
     e.undirected = !fwd && !back;
-    if (!source || !target) { diagnostics.danglingEdges.push(e.id); if (!source && !target) continue; }
+    if (!source || !target) diagnostics.danglingEdges.push(e.id);   // kept (drawn dashed) but ignored by lineage
     if (inferred) diagnostics.inferredEdges.push(e.id);
     edges.push(e);
   }
@@ -154,5 +164,8 @@ export function buildModel(graphEl, { snapTolerance = 24 } = {}) {
   for (const [t, ids] of labels) if (ids.length > 1) diagnostics.duplicateLabels.push({ label: t, ids });
 
   // drop edges whose only resolved end is a group-less ghost; keep the rest
-  return { nodes, edges, groups, diagnostics };
+  const layerById = new Map(layers.map(l => [l.id, l]));
+  for (const n of nodes.values()) { const l = layerById.get(n.layer); if (l && !n.isGroup) l.nodes++; }
+  for (const e of edges) { const l = layerById.get(e.layer); if (l) l.edges++; }
+  return { nodes, edges, groups, layers, diagnostics };
 }
